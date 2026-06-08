@@ -63,3 +63,8 @@ public class AuditLogRepository : GenericRepository<AuditLog>, IAuditLogReposito
     public AuditLogRepository(AppDbContext db) : base(db) { }
     
 }
+public class UnitOfMeasureRepository : GenericRepository<UnitsOfMeasure>, IUnitOfMeasureRepository
+{
+    public UnitOfMeasureRepository(AppDbContext db) : base(db) { }
+    
+}

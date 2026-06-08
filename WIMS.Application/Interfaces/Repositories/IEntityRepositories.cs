@@ -28,3 +28,8 @@ public interface IBinRepository : IGenericRepository<Bin>
 public interface IAuditLogRepository : IGenericRepository<AuditLog>
 {
 }
+
+public interface IUnitOfMeasureRepository : IGenericRepository<UnitsOfMeasure>
+{
+
+}

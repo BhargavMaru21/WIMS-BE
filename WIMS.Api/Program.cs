@@ -19,12 +19,14 @@ using WIMS.Application.Interfaces.Services.Admin;
 using WIMS.Application.Interfaces.Services.Audit;
 using WIMS.Application.Interfaces.Services.Auth;
 using WIMS.Application.Interfaces.Services.Profile;
+using WIMS.Application.Interfaces.Services.UnitOfMeasure;
 using WIMS.Application.Interfaces.Services.WarehouseManagement;
 using WIMS.Application.Mappings;
 using WIMS.Application.Service.Admin;
 using WIMS.Application.Service.Audit;
 using WIMS.Application.Service.Auth;
 using WIMS.Application.Service.Profile;
+using WIMS.Application.Service.UnitOfMeasure;
 using WIMS.Application.Service.WarehouseManagement;
 using WIMS.Application.Validators.Admin;
 using WIMS.Infrastructure.Data;
@@ -134,6 +136,7 @@ builder.Services.AddScoped<IWarehouseService, WarehouseService>();
 builder.Services.AddScoped<IZoneService, ZoneService>();
 builder.Services.AddScoped<ZoneService>();
 builder.Services.AddScoped<IBinService, BinService>();
+builder.Services.AddScoped<IUnitOfMeasureService, UnitOfMeasureService>();
 
 
 //repositories
@@ -142,6 +145,7 @@ builder.Services.AddScoped<IWarehouseRepository, WarehouseRepository>();
 builder.Services.AddScoped<IZoneRepository, ZoneRepository>();
 builder.Services.AddScoped<IBinRepository, BinRepository>();
 builder.Services.AddScoped<IAuditLogRepository, AuditLogRepository>();
+builder.Services.AddScoped<IUnitOfMeasureRepository,UnitOfMeasureRepository>();
 
 
 builder.Services.AddDbContext<AppDbContext>(options =>
