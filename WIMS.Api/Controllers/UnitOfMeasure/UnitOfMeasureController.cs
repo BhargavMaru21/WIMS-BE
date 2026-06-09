@@ -1,6 +1,8 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using WIMS.Application.DTOs;
+using WIMS.Application.DTOs.Products;
 using WIMS.Application.DTOs.UnitOfMeasure;
 using WIMS.Application.Interfaces.Common;
 using WIMS.Application.Interfaces.Services.UnitOfMeasure;
@@ -8,7 +10,7 @@ using WIMS.Application.Interfaces.Services.UnitOfMeasure;
 namespace WIMS.Api.Controllers.UnitOfMeasureController;
 
 [ApiController]
-[Route("api/uom")]
+[Route("api/unitOfMeasure")]
 [Authorize(Policy = "AdminOnly")]
 public class UnitOfMeasureController : ControllerBase
 {
@@ -22,16 +24,34 @@ public class UnitOfMeasureController : ControllerBase
         => int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
     [HttpPost]
-    public async Task<IActionResult> CreateUnit (CreateUnitRequest request)
+    public async Task<IActionResult> CreateUnit(CreateUnitRequest request)
     {
-        var response = await _unitOfMeasureService.CreateUnit(request,GetCurrentUserId());
+        var response = await _unitOfMeasureService.CreateUnit(request, GetCurrentUserId());
 
-        return response.IsSuccess ? Ok(response) : BadRequest(response);
+        return response.IsSuccess ? StatusCode(201,response) : BadRequest(response);
     }
     [HttpGet]
-    public async Task<IActionResult> GetUnits ()
+    public async Task<IActionResult> GetUnits()
     {
         var response = await _unitOfMeasureService.GetUnitsDropdown();
+
+        return Ok(response);
+    }
+
+    [HttpPatch("{id:int}")]
+    public async Task<IActionResult> UpdateUom(int id, UpdateUnitRequest request)
+    {
+        if(id <= 0){
+            return BadRequest(ApiResponse<UnitResponse>.Failure("Invalid ID", statusCode: 400));
+        }
+        var response = await _unitOfMeasureService.UpdateUnit(id, request, GetCurrentUserId());
+
+        if (!response.IsSuccess)
+        {
+            if (response.StatusCode == 404)
+                return NotFound(response);
+            return BadRequest(response);
+        }
 
         return Ok(response);
     }

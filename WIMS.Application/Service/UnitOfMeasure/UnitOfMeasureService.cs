@@ -1,5 +1,7 @@
 using AutoMapper;
+using ClosedXML.Excel;
 using WIMS.Application.DTOs;
+using WIMS.Application.DTOs.Products;
 using WIMS.Application.DTOs.UnitOfMeasure;
 using WIMS.Application.Interfaces.Common;
 using WIMS.Application.Interfaces.Repositories;
@@ -21,7 +23,7 @@ public class UnitOfMeasureService : IUnitOfMeasureService
         _mapper = mapper;
     }
 
-    public async Task<ApiResponse<UnitResponse>> CreateUnit (CreateUnitRequest request , int createdByUserId)
+    public async Task<ApiResponse<UnitResponse>> CreateUnit(CreateUnitRequest request, int createdByUserId)
     {
         request = _inputNormalizer.NormalizeObject(request);
 
@@ -30,9 +32,9 @@ public class UnitOfMeasureService : IUnitOfMeasureService
             return ApiResponse<UnitResponse>.Failure("Unit name already exists.", statusCode: 400);
         }
 
-        if(await _unitOfMeasureRepository.ExistsAsync(x => x.Abbreviation.ToLower() == request.Abbreviation.ToLower()))
+        if (await _unitOfMeasureRepository.ExistsAsync(x => x.Abbreviation.ToLower() == request.Abbreviation.ToLower()))
         {
-            return ApiResponse<UnitResponse>.Failure("Unit Abbreviation already exists.", statusCode:400);
+            return ApiResponse<UnitResponse>.Failure("Unit Abbreviation already exists.", statusCode: 400);
         }
 
         var UnitEntity = _mapper.Map<UnitsOfMeasure>(request);
@@ -42,15 +44,42 @@ public class UnitOfMeasureService : IUnitOfMeasureService
 
         var result = _mapper.Map<UnitResponse>(createdUnit);
 
-        return ApiResponse<UnitResponse>.Success(result,"Unit created successfully.", statusCode: 201);
+        return ApiResponse<UnitResponse>.Success(result, "Unit created successfully.", statusCode: 201);
     }
 
-    public async Task<ApiResponse<List<UnitResponse>>> GetUnitsDropdown ()
+    public async Task<ApiResponse<List<UnitResponse>>> GetUnitsDropdown()
     {
-        var allUnits = await _unitOfMeasureRepository.GetAllAsync( orderBy: q => q.OrderBy(u => u.Name));
+        var allUnits = await _unitOfMeasureRepository.GetAllAsync(orderBy: q => q.OrderBy(u => u.Name));
 
         var result = _mapper.Map<List<UnitResponse>>(allUnits);
 
-        return ApiResponse<List<UnitResponse>>.Success(result,statusCode:200);
+        return ApiResponse<List<UnitResponse>>.Success(result, statusCode: 200);
     }
+
+    public async Task<ApiResponse<UnitResponse>> UpdateUnit(int id, UpdateUnitRequest request, int modifiedByUserId)
+    {
+        request = _inputNormalizer.NormalizeObject(request);
+
+        var uom = await _unitOfMeasureRepository.GetAsync(x => x.Id == id, useNoTracking: false);
+
+        if (uom is null)
+            return ApiResponse<UnitResponse>.Failure("Unit of measure not found.", statusCode: 404);
+
+        if (!string.IsNullOrWhiteSpace(request.Name) &&
+            await _unitOfMeasureRepository.ExistsAsync(x => x.Name.ToLower() == request.Name.ToLower() && x.Id != id))
+            return ApiResponse<UnitResponse>.Failure("A unit of measure with this name already exists.", statusCode: 400);
+
+        if (!string.IsNullOrWhiteSpace(request.Abbreviation) &&
+            await _unitOfMeasureRepository.ExistsAsync(x => x.Abbreviation.ToLower() == request.Abbreviation.ToLower() && x.Id != id))
+            return ApiResponse<UnitResponse>.Failure("A unit of measure with this abbreviation already exists.", statusCode: 400);
+
+        uom.Name = !string.IsNullOrWhiteSpace(request.Name) ? request.Name : uom.Name;
+        uom.Abbreviation = !string.IsNullOrWhiteSpace(request.Abbreviation) ? request.Abbreviation : uom.Abbreviation;
+
+        await _unitOfMeasureRepository.SaveChangesAsync();
+        var response = _mapper.Map<UnitResponse>(uom);
+
+        return ApiResponse<UnitResponse>.Success(response, "Unit of measure updated successfully.", statusCode: 200);
+    }
+
 }

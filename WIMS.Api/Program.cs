@@ -18,6 +18,7 @@ using WIMS.Application.Interfaces.Repositories;
 using WIMS.Application.Interfaces.Services.Admin;
 using WIMS.Application.Interfaces.Services.Audit;
 using WIMS.Application.Interfaces.Services.Auth;
+using WIMS.Application.Interfaces.Services.ProductCategory;
 using WIMS.Application.Interfaces.Services.Profile;
 using WIMS.Application.Interfaces.Services.UnitOfMeasure;
 using WIMS.Application.Interfaces.Services.WarehouseManagement;
@@ -25,6 +26,7 @@ using WIMS.Application.Mappings;
 using WIMS.Application.Service.Admin;
 using WIMS.Application.Service.Audit;
 using WIMS.Application.Service.Auth;
+using WIMS.Application.Service;
 using WIMS.Application.Service.Profile;
 using WIMS.Application.Service.UnitOfMeasure;
 using WIMS.Application.Service.WarehouseManagement;
@@ -33,6 +35,8 @@ using WIMS.Infrastructure.Data;
 using WIMS.Infrastructure.Data.Seeder.Implementation;
 using WIMS.Infrastructure.Data.Seeder.Interface;
 using WIMS.Infrastructure.Repository;
+using WIMS.Application.Interfaces.Services.Products;
+using WIMS.Application.Service.Products;
 var builder = WebApplication.CreateBuilder(args);
 
 
@@ -137,6 +141,8 @@ builder.Services.AddScoped<IZoneService, ZoneService>();
 builder.Services.AddScoped<ZoneService>();
 builder.Services.AddScoped<IBinService, BinService>();
 builder.Services.AddScoped<IUnitOfMeasureService, UnitOfMeasureService>();
+builder.Services.AddScoped<IProductCategoryService, ProductCategoryService>();
+builder.Services.AddScoped<IProductService, ProductService>();
 
 
 //repositories
@@ -146,6 +152,8 @@ builder.Services.AddScoped<IZoneRepository, ZoneRepository>();
 builder.Services.AddScoped<IBinRepository, BinRepository>();
 builder.Services.AddScoped<IAuditLogRepository, AuditLogRepository>();
 builder.Services.AddScoped<IUnitOfMeasureRepository,UnitOfMeasureRepository>();
+builder.Services.AddScoped<IProductCategoryRepository, ProductCategoryRepository>();
+builder.Services.AddScoped<IProductRepository, ProductRepository>();
 
 
 builder.Services.AddDbContext<AppDbContext>(options =>

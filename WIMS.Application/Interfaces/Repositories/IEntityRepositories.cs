@@ -33,3 +33,14 @@ public interface IUnitOfMeasureRepository : IGenericRepository<UnitsOfMeasure>
 {
 
 }
+
+public interface IProductCategoryRepository : IGenericRepository<ProductCategory>
+{
+    Task<bool> HasActiveProductsAsync(int categoryId);
+    Task<bool> IsActive(int categoryId);
+}
+
+public interface IProductRepository : IGenericRepository<Product>
+{
+    Task<bool> HasStockAsync(int productId);
+}
