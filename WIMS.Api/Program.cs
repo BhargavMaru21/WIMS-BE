@@ -124,10 +124,10 @@ builder.Services.AddValidatorsFromAssemblyContaining<CreateUserRequestValidator>
 //DI
 //Helper
 builder.Services.AddScoped<ISeeder, Seeder>();
-builder.Services.AddScoped<IInputNormalizer, InputNormalizer>();
-builder.Services.AddScoped<IPasswordHasher, PasswordHasher>();
-builder.Services.AddScoped<ICodeGeneratorService, CodeGeneratorService>();
-builder.Services.AddScoped<IJwtService, JwtService>();
+builder.Services.AddSingleton<IInputNormalizer, InputNormalizer>();
+builder.Services.AddSingleton<IPasswordHasher, PasswordHasher>();
+builder.Services.AddSingleton<ICodeGeneratorService, CodeGeneratorService>();
+builder.Services.AddSingleton<IJwtService, JwtService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 
 
