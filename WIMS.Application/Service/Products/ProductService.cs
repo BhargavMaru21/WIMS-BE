@@ -84,6 +84,8 @@ public class ProductService : IProductService
 
     public async Task<ApiResponse<string>> ImportFile(ImportDto request, int createdByUserId)
     {
+        var templateFileColumns = new List<string> { "name", "Description", "CategoryId", "UomId", "UnitPrice", "ReorderLevel" };
+
         // Process file in-memory using ClosedXML
         using var stream = new MemoryStream();
 
@@ -91,8 +93,28 @@ public class ProductService : IProductService
         using (var workbook = new XLWorkbook(stream))
         {
             var worksheet = workbook.Worksheets.First();
+
+            //validating file formate.
+            var headerRow = worksheet.FirstRow();
+
+            if (headerRow is null)
+                return ApiResponse<string>.Failure("Uploaded File is not in Proper Formate. Please Use Template File With Proper header row.");
+
+            var actuallColumns = headerRow.CellsUsed().Select(c => c.Value.ToString().Trim()).ToList();
+
+
+            var isValid = templateFileColumns.SequenceEqual(actuallColumns, StringComparer.OrdinalIgnoreCase);
+
+            if (!isValid)
+                return ApiResponse<string>.Failure("Uploaded File is not in Proper Formate. Please Use Template File.");
+
+            var dataRowCount = worksheet.RangeUsed().RowsUsed().Skip(2).Count();
+
+            if (dataRowCount == 0)
+                return ApiResponse<string>.Failure("Uploaded File Has No data.Please Fill data with proper formate.");
+
             await _productRepository.BeginTransactionAsync();
-            foreach (var row in worksheet.RangeUsed().RowsUsed().Skip(1))
+            foreach (var row in worksheet.RangeUsed().RowsUsed().Skip(2))
             {
                 var name = row.Cell(1).GetValue<string>().Trim();
                 var description = row.Cell(2).GetValue<string>().Trim();
@@ -104,18 +126,18 @@ public class ProductService : IProductService
                 var category = await _categoryRepository.GetAsync(x => x.Id == categoryId);
 
                 if (category is null)
-                    return ApiResponse<string>.Failure("Category not found.", statusCode: 404);
+                    return ApiResponse<string>.Failure($"Category not found for categoryId : {categoryId}.No Data is Added From this file.", statusCode: 404);
 
                 if (category.Status == EntityStatus.Inactive)
-                    return ApiResponse<string>.Failure("Cannot add a product to an inactive category.", statusCode: 400);
+                    return ApiResponse<string>.Failure($"Cannot add a product to an inactive category. InActive CategoryId : {categoryId}.No Data is Added From this file.", statusCode: 400);
 
                 var uom = await _uomRepository.GetAsync(x => x.Id == uomId);
 
                 if (uom is null)
-                    return ApiResponse<string>.Failure("Unit of measure not found.", statusCode: 404);
+                    return ApiResponse<string>.Failure($"Unit of measure not found for UomId : {uomId}.No Data is Added From this file.", statusCode: 404);
 
                 if (await _productRepository.ExistsAsync(x => x.Name.ToLower() == name.ToLower()))
-                    return ApiResponse<string>.Failure($"A product with this name ({name}) already exists.", statusCode: 400);
+                    return ApiResponse<string>.Failure($"A product with this name ({name}) already exists.No Data is Added From this file.", statusCode: 400);
 
                 try
                 {
@@ -286,7 +308,7 @@ public class ProductService : IProductService
 
         return ApiResponse<string>.Success($"Product {product.Status} successfully.", statusCode: 200);
     }
-    
+
     public async Task<ApiResponse<string>> DeleteProduct(int id, int deletedBy)
     {
         var product = await _productRepository.GetAsync(x => x.Id == id, useNoTracking: false);
