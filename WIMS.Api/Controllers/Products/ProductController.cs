@@ -105,7 +105,7 @@ public class ProductController : ControllerBase
             return BadRequest(response);
         }
 
-        return NoContent();
+        return Ok(response);
     }
 
     [HttpPost("import")]
@@ -133,9 +133,9 @@ public class ProductController : ControllerBase
     [Authorize(Policy = "AdminOnly")]
     public async Task<IActionResult> ExportExcel()
     {
-        var response = await _productService.GetProducts(new QueryParameters {PageNumber = 1 , PageSize = 100});
+        var response = await _productService.GetAllProducts();
 
-        var data = response.Data!.Items;
+        var data = response.Data;
 
         //Initialize the ClosedXML Workbook and Worksheet
         using var workbook = new XLWorkbook();
@@ -192,6 +192,5 @@ public class ProductController : ControllerBase
         string fileName = "Products_Export.xlsx";
 
         return File(stream.ToArray(), contentType, fileName);
-
     }
 }

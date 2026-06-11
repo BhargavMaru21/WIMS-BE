@@ -38,7 +38,7 @@ public class ZoneRepository : GenericRepository<Zone>, IZoneRepository
     public async Task<List<Zone>> GetActiveZoneByWarehouseAsync(int warehouseId)
             => await _dbSet
                 .AsNoTracking()
-                .Where(z => z.WarehouseId == warehouseId && z.Status == EntityStatus.Active)    
+                .Where(z => z.WarehouseId == warehouseId && z.Status == EntityStatus.Active)
                 .OrderBy(z => z.Code)
                 .ToListAsync();
 }
@@ -61,22 +61,24 @@ public class BinRepository : GenericRepository<Bin>, IBinRepository
 public class AuditLogRepository : GenericRepository<AuditLog>, IAuditLogRepository
 {
     public AuditLogRepository(AppDbContext db) : base(db) { }
-    
+
 }
 public class UnitOfMeasureRepository : GenericRepository<UnitsOfMeasure>, IUnitOfMeasureRepository
 {
     public UnitOfMeasureRepository(AppDbContext db) : base(db) { }
-    
+
+    public async Task<bool> IsAssignedToProductAsync(int uomId)
+        => await _db.Set<Product>().AnyAsync(p => p.UomId == uomId);
+
 }
 
 public class ProductCategoryRepository : GenericRepository<ProductCategory>, IProductCategoryRepository
 {
     public ProductCategoryRepository(AppDbContext db) : base(db) { }
- 
+
     public async Task<bool> HasActiveProductsAsync(int categoryId)
-        => await _db.Set<Product>()
-            .AnyAsync(p => p.CategoryId == categoryId && p.Status == EntityStatus.Active);
-    
+        => await _db.Set<Product>().AnyAsync(p => p.CategoryId == categoryId && p.Status == EntityStatus.Active);
+
     public async Task<bool> IsActive(int categoryId)
         => await _dbSet.Where(p => p.Id == categoryId)
             .Select(p => p.Status == EntityStatus.Active)
@@ -86,7 +88,7 @@ public class ProductCategoryRepository : GenericRepository<ProductCategory>, IPr
 public class ProductRepository : GenericRepository<Product>, IProductRepository
 {
     public ProductRepository(AppDbContext db) : base(db) { }
- 
+
     public async Task<bool> HasStockAsync(int productId)
         => await _db.Set<StockRecord>()
             .AnyAsync(sr => sr.ProductId == productId && sr.Quantity > 0);

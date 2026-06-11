@@ -15,7 +15,9 @@ public class QueryParametersValidator : AbstractValidator<QueryParameters>
         "CreatedAt",
         "UpdatedAt",
         "Code",
-        "MaxCapacity"
+        "MaxCapacity",
+        "Sku",
+        "UnitPrice"
     };
 
     public QueryParametersValidator()

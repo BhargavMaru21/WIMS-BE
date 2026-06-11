@@ -31,7 +31,7 @@ public interface IAuditLogRepository : IGenericRepository<AuditLog>
 
 public interface IUnitOfMeasureRepository : IGenericRepository<UnitsOfMeasure>
 {
-
+    Task<bool> IsAssignedToProductAsync(int uomId);
 }
 
 public interface IProductCategoryRepository : IGenericRepository<ProductCategory>

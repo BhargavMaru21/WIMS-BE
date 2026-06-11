@@ -181,6 +181,15 @@ public class ProductService : IProductService
         return ApiResponse<PagedResult<ProductResponse>>.Success(result, statusCode: 200);
     }
 
+    public async Task<ApiResponse<List<ProductResponse>>> GetAllProducts()
+    {
+        var allProducts = await _productRepository.GetAllAsync(orderBy: q => q.OrderBy(x => x.Sku));
+
+        var result = _mapper.Map<List<ProductResponse>>(allProducts);
+
+        return ApiResponse<List<ProductResponse>>.Success(result, statusCode: 200);
+    }
+
     public async Task<ApiResponse<ProductResponse>> UpdateProduct(int id, ProductUpdateRequest request, int modifiedByUserId)
     {
         request = _inputNormalizer.NormalizeObject(request);
@@ -277,7 +286,7 @@ public class ProductService : IProductService
 
         return ApiResponse<string>.Success($"Product {product.Status} successfully.", statusCode: 200);
     }
-
+    
     public async Task<ApiResponse<string>> DeleteProduct(int id, int deletedBy)
     {
         var product = await _productRepository.GetAsync(x => x.Id == id, useNoTracking: false);

@@ -8,6 +8,7 @@ public interface IProductService
     Task<ApiResponse<ProductResponse>> CreateProduct(ProductCreateRequest request, int createdByUserId);
     Task<ApiResponse<string>> ImportFile(ImportDto request, int createdByUserId);
     Task<ApiResponse<ProductResponse>> GetProductById(int id);
+    Task<ApiResponse<List<ProductResponse>>> GetAllProducts();
     Task<ApiResponse<PagedResult<ProductResponse>>> GetProducts(QueryParameters qp);
     Task<ApiResponse<ProductResponse>> UpdateProduct(int id, ProductUpdateRequest request, int modifiedByUserId);
     Task<ApiResponse<string>> UpdateProductStatus(int id, ProductStatusUpdateRequest request, int modifiedByUserId);

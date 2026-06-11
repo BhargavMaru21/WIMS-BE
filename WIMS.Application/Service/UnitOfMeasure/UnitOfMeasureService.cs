@@ -56,7 +56,7 @@ public class UnitOfMeasureService : IUnitOfMeasureService
         return ApiResponse<List<UnitResponse>>.Success(result, statusCode: 200);
     }
 
-    public async Task<ApiResponse<UnitResponse>> UpdateUnit(int id, UpdateUnitRequest request, int modifiedByUserId)
+    public async Task<ApiResponse<UnitResponse>> UpdateUnit(int id, UpdateUnitRequest request)
     {
         request = _inputNormalizer.NormalizeObject(request);
 
@@ -80,6 +80,26 @@ public class UnitOfMeasureService : IUnitOfMeasureService
         var response = _mapper.Map<UnitResponse>(uom);
 
         return ApiResponse<UnitResponse>.Success(response, "Unit of measure updated successfully.", statusCode: 200);
+    }
+
+    public async Task<ApiResponse<string>> DeleteUnit(int id)
+    {
+        var uom = await _unitOfMeasureRepository.GetAsync(x => x.Id == id,useNoTracking : false);
+
+        if(uom is null)
+        {
+            return ApiResponse<string>.Failure("Unit not Found",statusCode:404);
+        }
+
+        if(await _unitOfMeasureRepository.IsAssignedToProductAsync(uom.Id))
+        {
+            return ApiResponse<string>.Failure("Unit is Assigned to Product. It can not be delete",statusCode:400);
+        }
+
+        if(await _unitOfMeasureRepository.DeleteAsync(uom))
+            return ApiResponse<string>.Success("Unit Deleted Successfully",statusCode:200);   
+
+        return ApiResponse<string>.Failure("Error occur while Deleting Unit",statusCode:500);
     }
 
 }

@@ -28,7 +28,7 @@ public class UnitOfMeasureController : ControllerBase
     {
         var response = await _unitOfMeasureService.CreateUnit(request, GetCurrentUserId());
 
-        return response.IsSuccess ? StatusCode(201,response) : BadRequest(response);
+        return response.IsSuccess ? StatusCode(201, response) : BadRequest(response);
     }
     [HttpGet]
     public async Task<IActionResult> GetUnits()
@@ -41,10 +41,29 @@ public class UnitOfMeasureController : ControllerBase
     [HttpPatch("{id:int}")]
     public async Task<IActionResult> UpdateUom(int id, UpdateUnitRequest request)
     {
-        if(id <= 0){
+        if (id <= 0)
+        {
             return BadRequest(ApiResponse<UnitResponse>.Failure("Invalid ID", statusCode: 400));
         }
-        var response = await _unitOfMeasureService.UpdateUnit(id, request, GetCurrentUserId());
+        var response = await _unitOfMeasureService.UpdateUnit(id, request);
+
+        if (!response.IsSuccess)
+        {
+            if (response.StatusCode == 404)
+                return NotFound(response);
+            return BadRequest(response);
+        }
+
+        return Ok(response);
+    }
+
+    [HttpDelete("{id:int}")]
+    public async Task<IActionResult> DeleteUom(int id)
+    {
+        if (id <= 0)
+            return BadRequest(ApiResponse<string>.Failure("Invalid ID", statusCode: 400));
+
+        var response = await _unitOfMeasureService.DeleteUnit(id);
 
         if (!response.IsSuccess)
         {
