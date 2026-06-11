@@ -33,7 +33,7 @@ public class WarehouseController : ControllerBase
             return BadRequest(response);
         }
 
-        return Ok(response);
+        return StatusCode(201, response);
     }
 
 

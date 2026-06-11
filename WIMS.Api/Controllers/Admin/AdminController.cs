@@ -33,7 +33,7 @@ public class AdminController : ControllerBase
             return BadRequest(response);
         }
 
-        return Ok(response);
+        return StatusCode(201, response);
     }
 
     [HttpGet("users")]
@@ -66,21 +66,21 @@ public class AdminController : ControllerBase
             return BadRequest(ApiResponse<UserResponseDto>.Failure("Invalid user ID.", statusCode: 400));
         }
 
-        var response = await _adminUserManagementService.Deleteuser(id,GetCurrentUserId());
+        var response = await _adminUserManagementService.Deleteuser(id, GetCurrentUserId());
 
-       if(response.IsSuccess == false)
-       {
-           if (response.StatusCode == 404)
-           {
-               return NotFound(response);
-           }
-           else
-           {
-               return BadRequest(response);
-           }
-       }
-       
-       return Ok(response);
+        if (response.IsSuccess == false)
+        {
+            if (response.StatusCode == 404)
+            {
+                return NotFound(response);
+            }
+            else
+            {
+                return BadRequest(response);
+            }
+        }
+
+        return Ok(response);
     }
 
     [HttpPatch("users/{id:int}/status")]
@@ -159,5 +159,4 @@ public class AdminController : ControllerBase
 
         return Ok(response);
     }
-
 }

@@ -28,3 +28,19 @@ public interface IBinRepository : IGenericRepository<Bin>
 public interface IAuditLogRepository : IGenericRepository<AuditLog>
 {
 }
+
+public interface IUnitOfMeasureRepository : IGenericRepository<UnitsOfMeasure>
+{
+    Task<bool> IsAssignedToProductAsync(int uomId);
+}
+
+public interface IProductCategoryRepository : IGenericRepository<ProductCategory>
+{
+    Task<bool> HasActiveProductsAsync(int categoryId);
+    Task<bool> IsActive(int categoryId);
+}
+
+public interface IProductRepository : IGenericRepository<Product>
+{
+    Task<bool> HasStockAsync(int productId);
+}
