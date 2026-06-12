@@ -248,7 +248,7 @@ public class ProductService : IProductService
 
     public async Task<ApiResponse<List<ProductResponse>>> GetAllProducts()
     {
-        var allProducts = await _productRepository.GetAllAsync(orderBy: q => q.OrderBy(x => x.Sku));
+        var allProducts = await _productRepository.GetAllAsync(orderBy: q => q.OrderBy(x => x.Sku),includes : p => p.Include(x => x.Uom));
 
         var result = _mapper.Map<List<ProductResponse>>(allProducts);
 
