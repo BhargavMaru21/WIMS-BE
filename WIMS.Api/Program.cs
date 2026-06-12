@@ -119,6 +119,7 @@ builder.Services.AddControllers()
 
 //fluent validation
 builder.Services.AddFluentValidationAutoValidation();
+ValidatorOptions.Global.DefaultRuleLevelCascadeMode = CascadeMode.Stop;
 builder.Services.AddValidatorsFromAssemblyContaining<CreateUserRequestValidator>();
 
 //DI

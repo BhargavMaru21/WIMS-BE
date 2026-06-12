@@ -1,5 +1,6 @@
 using AutoMapper;
 using ClosedXML.Excel;
+using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 using WIMS.Application.DTOs;
 using WIMS.Application.DTOs.Products;
@@ -20,6 +21,7 @@ public class ProductService : IProductService
     private readonly IMapper _mapper;
     private readonly IInputNormalizer _inputNormalizer;
     private readonly ICodeGeneratorService _codeGeneratorService;
+    private readonly IValidator<ProductCreateRequest> _productValidator;
 
     public ProductService(
         IProductRepository productRepository,
@@ -27,7 +29,9 @@ public class ProductService : IProductService
         IUnitOfMeasureRepository uomRepository,
         IMapper mapper,
         IInputNormalizer inputNormalizer,
-        ICodeGeneratorService codeGeneratorService)
+        ICodeGeneratorService codeGeneratorService,
+        IValidator<ProductCreateRequest> productValidator
+        )
     {
         _productRepository = productRepository;
         _categoryRepository = categoryRepository;
@@ -35,6 +39,7 @@ public class ProductService : IProductService
         _mapper = mapper;
         _inputNormalizer = inputNormalizer;
         _codeGeneratorService = codeGeneratorService;
+        _productValidator = productValidator;
     }
 
     public async Task<ApiResponse<ProductResponse>> CreateProduct(ProductCreateRequest request, int createdByUserId)
@@ -108,20 +113,48 @@ public class ProductService : IProductService
             if (!isValid)
                 return ApiResponse<string>.Failure("Uploaded File is not in Proper Formate. Please Use Template File.");
 
-            var dataRowCount = worksheet.RangeUsed().RowsUsed().Skip(2).Count();
+            var dataRowCount = worksheet.RangeUsed()!.RowsUsed().Skip(2).Count();
 
             if (dataRowCount == 0)
                 return ApiResponse<string>.Failure("Uploaded File Has No data.Please Fill data with proper formate.");
 
             await _productRepository.BeginTransactionAsync();
-            foreach (var row in worksheet.RangeUsed().RowsUsed().Skip(2))
+            foreach (var row in worksheet.RangeUsed()!.RowsUsed().Skip(2))
             {
+                //for empty row
+                if(row.Cells().All(c => string.IsNullOrWhiteSpace(c.GetString())))
+                    continue;
+                
                 var name = row.Cell(1).GetValue<string>().Trim();
                 var description = row.Cell(2).GetValue<string>().Trim();
-                var categoryId = row.Cell(3).GetValue<int>();
-                var uomId = row.Cell(4).GetValue<int>();
-                var unitPrice = row.Cell(5).GetValue<decimal>();
-                var reorderLevel = row.Cell(6).GetValue<decimal>();
+                var categoryIdExcel = row.Cell(3).GetValue<string>().Trim();
+                var uomIdExcel = row.Cell(4).GetValue<string>().Trim();
+                var unitPriceExcel = row.Cell(5).GetValue<string>().Trim();
+                var reorderLevelExcel = row.Cell(6).GetValue<string>().Trim();
+
+                if(!int.TryParse(categoryIdExcel, out int categoryId) || categoryId <= 0)
+                {
+                    await _productRepository.RollbackTransactionAsync();
+                    return ApiResponse<string>.Failure($"Row {row.RowNumber()} : CategoryId must be valid positive number");
+                }
+
+                if(!int.TryParse(uomIdExcel, out int uomId) || uomId <= 0)
+                {
+                    await _productRepository.RollbackTransactionAsync();
+                    return ApiResponse<string>.Failure($"Row {row.RowNumber()} : uomId must be valid positive number");
+                }
+
+                if(!decimal.TryParse(unitPriceExcel, out decimal unitPrice) || uomId <= 0)
+                {
+                    await _productRepository.RollbackTransactionAsync();
+                    return ApiResponse<string>.Failure($"Row {row.RowNumber()} : unitPrice must be valid positive number");
+                }
+
+                if(!decimal.TryParse(reorderLevelExcel, out decimal reorderLevel) || reorderLevel <= 0)
+                {
+                    await _productRepository.RollbackTransactionAsync();
+                    return ApiResponse<string>.Failure($"Row {row.RowNumber()} : reorderLevel must be valid positive number");
+                }
 
                 var category = await _categoryRepository.GetAsync(x => x.Id == categoryId);
 
@@ -141,17 +174,27 @@ public class ProductService : IProductService
 
                 try
                 {
-                    var entity = new Product
+                    var productRequestDto = new ProductCreateRequest
                     {
-                        Sku = "TEMP",
                         Name = name,
-                        Description = description,
+                        Description = String.IsNullOrWhiteSpace(description) ? null : description,
                         CategoryId = categoryId,
                         UomId = uomId,
                         UnitPrice = unitPrice,
-                        ReorderLevel = reorderLevel,
-                        CreatedBy = createdByUserId
+                        ReorderLevel = reorderLevel
                     };
+
+                    var validationResult = await _productValidator.ValidateAsync(productRequestDto);
+
+                    if(!validationResult.IsValid)
+                    {
+                        await _productRepository.RollbackTransactionAsync();
+                        var errors = validationResult.Errors.Select(e => e.ErrorMessage);
+                        return ApiResponse<string>.Failure($"Row number : {row.RowNumber()} Is Invalid . {string.Join(" ",errors)}");
+                    }
+
+                    var entity = _mapper.Map<Product>(productRequestDto);
+                    entity.CreatedBy = createdByUserId;
 
                     var createdProduct = await _productRepository.CreateAsync(entity);
 
