@@ -161,7 +161,7 @@ public class ProductController : ControllerBase
 
         //Populate Data Rows dynamically
         int currentRow = 2;
-        foreach (var product in data)
+        foreach (var product in data!)
         {
             worksheet.Cell(currentRow, 1).Value = product.Sku;
             worksheet.Cell(currentRow, 2).Value = product.Name;

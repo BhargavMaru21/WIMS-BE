@@ -37,6 +37,7 @@ using WIMS.Infrastructure.Data.Seeder.Interface;
 using WIMS.Infrastructure.Repository;
 using WIMS.Application.Interfaces.Services.Products;
 using WIMS.Application.Service.Products;
+using WIMS.Application.Interfaces.Services.PurchaseOrder;
 var builder = WebApplication.CreateBuilder(args);
 
 
@@ -144,6 +145,7 @@ builder.Services.AddScoped<IBinService, BinService>();
 builder.Services.AddScoped<IUnitOfMeasureService, UnitOfMeasureService>();
 builder.Services.AddScoped<IProductCategoryService, ProductCategoryService>();
 builder.Services.AddScoped<IProductService, ProductService>();
+builder.Services.AddScoped<IPurchaseOrderService,PurchaseOrderService>();
 
 
 //repositories
@@ -155,6 +157,7 @@ builder.Services.AddScoped<IAuditLogRepository, AuditLogRepository>();
 builder.Services.AddScoped<IUnitOfMeasureRepository,UnitOfMeasureRepository>();
 builder.Services.AddScoped<IProductCategoryRepository, ProductCategoryRepository>();
 builder.Services.AddScoped<IProductRepository, ProductRepository>();
+builder.Services.AddScoped<IPurchaseOrderRepository , PurchaseOrderRepository>();
 
 
 builder.Services.AddDbContext<AppDbContext>(options =>

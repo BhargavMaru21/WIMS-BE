@@ -93,3 +93,9 @@ public class ProductRepository : GenericRepository<Product>, IProductRepository
         => await _db.Set<StockRecord>()
             .AnyAsync(sr => sr.ProductId == productId && sr.Quantity > 0);
 }
+
+public class PurchaseOrderRepository : GenericRepository<PurchaseOrder>, IPurchaseOrderRepository
+{
+    public PurchaseOrderRepository(AppDbContext db) : base(db) {}
+
+}
