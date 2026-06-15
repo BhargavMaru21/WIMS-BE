@@ -94,8 +94,12 @@ public class ProductRepository : GenericRepository<Product>, IProductRepository
             .AnyAsync(sr => sr.ProductId == productId && sr.Quantity > 0);
 }
 
-public class PurchaseOrderRepository : GenericRepository<PurchaseOrder>, IPurchaseOrderRepository
+public class PoRepository : GenericRepository<PurchaseOrder>, IPoRepository
 {
-    public PurchaseOrderRepository(AppDbContext db) : base(db) {}
-
+    public PoRepository(AppDbContext db) : base(db) { }
+}
+ 
+public class PoItemRepository : GenericRepository<PurchaseOrderItem>, IPoItemRepository
+{
+    public PoItemRepository(AppDbContext db) : base(db) { }
 }

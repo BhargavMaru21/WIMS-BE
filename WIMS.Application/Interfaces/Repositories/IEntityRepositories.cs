@@ -45,7 +45,10 @@ public interface IProductRepository : IGenericRepository<Product>
     Task<bool> HasStockAsync(int productId);
 }
 
-public interface IPurchaseOrderRepository : IGenericRepository<PurchaseOrder>
+public interface IPoRepository : IGenericRepository<PurchaseOrder>
 {
-    
+}
+ 
+public interface IPoItemRepository : IGenericRepository<PurchaseOrderItem>
+{
 }

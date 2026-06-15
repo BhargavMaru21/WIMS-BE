@@ -4,26 +4,90 @@ using WIMS.Application.DTOs.PurchaseOrder;
 
 namespace WIMS.Application.Validators.PurchaseOrder;
 
-public class PurchaseOrderCreateRequestValidator : AbstractValidator<PurchaseOrderCreateRequest>
+public class PoCreateRequestValidator : AbstractValidator<PoCreateRequest>
 {
-    public PurchaseOrderCreateRequestValidator()
+    public PoCreateRequestValidator()
     {
         RuleFor(x => x.SupplierName)
-            .NotEmpty().WithMessage("Supplier Name is required")
+            .NotEmpty().WithMessage("Supplier name is required.")
             .Matches(@"^[a-zA-Z\s]+$").WithMessage("Supplier Name can only contain letters and spaces.")
-            .MinimumLength(2).WithMessage("Supplier Name must contain at least 2 characters")
-            .MaximumLength(200).WithMessage("Supplier Name cannot exceed 150 characters.");
+            .MinimumLength(2).WithMessage("Supplier name must be at least 2 characters.")
+            .MaximumLength(200).WithMessage("Supplier name must not exceed 200 characters.");
+
+        RuleFor(x => x.SupplierContact)
+           .Matches(@"^(?:\+91[\-\s]?)?[6-9]\d{9}$").WithMessage("Supplier contact must be a valid Indian phone number.")
+           .When(x => !string.IsNullOrWhiteSpace(x.SupplierContact));
+
+        RuleFor(x => x.ExpectedDelivery)
+            .NotEmpty().WithMessage("Expected Delivery date not empty")
+            .GreaterThan(DateOnly.FromDateTime(HelperService.ToIST(DateTime.UtcNow))).WithMessage("Expected delivery date must be in the future.");
+
+        RuleFor(x => x.Notes)
+            .MaximumLength(1000).WithMessage("Notes must not exceed 1000 characters.")
+            .When(x => !string.IsNullOrWhiteSpace(x.Notes));
+    }
+}
+
+public class PoUpdateRequestValidator : AbstractValidator<PoUpdateRequest>
+{
+    public PoUpdateRequestValidator()
+    {
+        RuleFor(x => x.SupplierName)
+            .Matches(@"^[a-zA-Z\s]+$").WithMessage("Supplier Name can only contain letters and spaces.")
+            .MinimumLength(2).WithMessage("Supplier name must be at least 2 characters.")
+            .MaximumLength(200).WithMessage("Supplier name must not exceed 200 characters.")
+            .When(x => !string.IsNullOrWhiteSpace(x.SupplierName));
 
         RuleFor(x => x.SupplierContact)
             .Matches(@"^(?:\+91[\-\s]?)?[6-9]\d{9}$").WithMessage("Supplier contact must be a valid Indian phone number.")
             .When(x => !string.IsNullOrWhiteSpace(x.SupplierContact));
 
-        RuleFor(x => x.Notes)
-            .MaximumLength(1000).WithMessage("Note must not exceed 1000 characters.")
-            .When(x => !string.IsNullOrWhiteSpace(x.Notes));
-
         RuleFor(x => x.ExpectedDelivery)
-            .NotEmpty().WithMessage("Expected Delivery date not empty")
-            .GreaterThan(DateOnly.FromDateTime(HelperService.ToIST(DateTime.UtcNow))).WithMessage("Expected Delivery date greater then today's date");
+            .GreaterThan(DateOnly.FromDateTime(HelperService.ToIST(DateTime.UtcNow))).WithMessage("Expected delivery date must be in the future.")
+            .When(x => x.ExpectedDelivery.HasValue);
+
+        RuleFor(x => x.Notes)
+            .MaximumLength(1000).WithMessage("Notes must not exceed 1000 characters.")
+            .When(x => !string.IsNullOrWhiteSpace(x.Notes));
+    }
+}
+
+public class PoItemCreateRequestValidator : AbstractValidator<PoItemCreateRequest>
+{
+    public PoItemCreateRequestValidator()
+    {
+        RuleFor(x => x.ProductId)
+            .GreaterThan(0).WithMessage("A valid ProductId is required.");
+
+        RuleFor(x => x.OrderedQty)
+            .GreaterThan(0).WithMessage("Ordered quantity must be greater than zero.");
+
+        RuleFor(x => x.UnitPrice)
+            .GreaterThan(0).WithMessage("Unit price must be greater than zero.");
+    }
+}
+
+public class PoItemUpdateRequestValidator : AbstractValidator<PoItemUpdateRequest>
+{
+    public PoItemUpdateRequestValidator()
+    {
+        RuleFor(x => x.OrderedQty)
+            .GreaterThan(0).WithMessage("Ordered quantity mu    st be greater than zero.")
+            .When(x => x.OrderedQty.HasValue);
+
+        RuleFor(x => x.UnitPrice)
+            .GreaterThan(0).WithMessage("Unit price must be greater than zero.")
+            .When(x => x.UnitPrice.HasValue);
+    }
+}
+
+public class PoRejectRequestValidator : AbstractValidator<PoRejectRequest>
+{
+    public PoRejectRequestValidator()
+    {
+        RuleFor(x => x.RejectionReason)
+            .NotEmpty().WithMessage("Rejection reason is required")
+            .MinimumLength(5).WithMessage("Rejection reason must be at least 5 characters.")
+            .MaximumLength(500).WithMessage("Rejection reason must not exceed 500 characters.");
     }
 }

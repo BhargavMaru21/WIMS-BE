@@ -145,7 +145,7 @@ builder.Services.AddScoped<IBinService, BinService>();
 builder.Services.AddScoped<IUnitOfMeasureService, UnitOfMeasureService>();
 builder.Services.AddScoped<IProductCategoryService, ProductCategoryService>();
 builder.Services.AddScoped<IProductService, ProductService>();
-builder.Services.AddScoped<IPurchaseOrderService,PurchaseOrderService>();
+builder.Services.AddScoped<IPoService,PoService>();
 
 
 //repositories
@@ -157,7 +157,8 @@ builder.Services.AddScoped<IAuditLogRepository, AuditLogRepository>();
 builder.Services.AddScoped<IUnitOfMeasureRepository,UnitOfMeasureRepository>();
 builder.Services.AddScoped<IProductCategoryRepository, ProductCategoryRepository>();
 builder.Services.AddScoped<IProductRepository, ProductRepository>();
-builder.Services.AddScoped<IPurchaseOrderRepository , PurchaseOrderRepository>();
+builder.Services.AddScoped<IPoRepository , PoRepository>();
+builder.Services.AddScoped<IPoItemRepository,PoItemRepository>();
 
 
 builder.Services.AddDbContext<AppDbContext>(options =>

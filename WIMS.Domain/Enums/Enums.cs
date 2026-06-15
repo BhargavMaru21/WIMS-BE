@@ -27,7 +27,8 @@ public enum PoStatus
     Approved,
     PartiallyReceived,
     FullyReceived,
-    Cancelled
+    Cancelled,
+    Rejected
 }
 
 public enum DispatchStatus
