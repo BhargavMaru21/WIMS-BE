@@ -2,5 +2,5 @@ namespace WIMS.Application.DTOs.PurchaseOrder;
 
 public class PoRejectRequest
 {
-    public string? RejectionReason { get; set; }
+    public required string RejectionReason { get; set; }
 }

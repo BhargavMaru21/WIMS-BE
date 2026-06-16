@@ -61,9 +61,6 @@ public class PoItemCreateRequestValidator : AbstractValidator<PoItemCreateReques
 
         RuleFor(x => x.OrderedQty)
             .GreaterThan(0).WithMessage("Ordered quantity must be greater than zero.");
-
-        RuleFor(x => x.UnitPrice)
-            .GreaterThan(0).WithMessage("Unit price must be greater than zero.");
     }
 }
 
@@ -72,12 +69,8 @@ public class PoItemUpdateRequestValidator : AbstractValidator<PoItemUpdateReques
     public PoItemUpdateRequestValidator()
     {
         RuleFor(x => x.OrderedQty)
-            .GreaterThan(0).WithMessage("Ordered quantity mu    st be greater than zero.")
+            .GreaterThan(0).WithMessage("Ordered quantity must be greater than zero.")
             .When(x => x.OrderedQty.HasValue);
-
-        RuleFor(x => x.UnitPrice)
-            .GreaterThan(0).WithMessage("Unit price must be greater than zero.")
-            .When(x => x.UnitPrice.HasValue);
     }
 }
 

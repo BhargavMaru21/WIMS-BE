@@ -164,7 +164,7 @@ public class PoService : IPoService
         var result = new PagedResult<PoResponse>
         {
             Items = FilteredItem,
-            TotalCount = paged.TotalCount,
+            TotalCount = FilteredItem.Count(),
             PageSize = paged.PageSize,
             PageNumber = paged.PageNumber
         };
@@ -192,6 +192,9 @@ public class PoService : IPoService
 
         if (po.WarehouseId != managerWarehouseId)
             return ApiResponse<PoResponse>.Failure("This purchase order does not belong to your warehouse.", statusCode: 403);
+
+        if (po.CreatedBy != currentUserId)
+            return ApiResponse<PoResponse>.Failure("This purchase order is not belong to your account", statusCode: 403);
 
         if (po.Status != PoStatus.Draft)
             return ApiResponse<PoResponse>.Failure("Only draft purchase orders can be edited.", statusCode: 400);
@@ -231,10 +234,13 @@ public class PoService : IPoService
         if (po.WarehouseId != managerWarehouseId)
             return ApiResponse<PoItemResponse>.Failure("This purchase order does not belong to your warehouse.", statusCode: 403);
 
+        if (po.CreatedBy != currentUserId)
+            return ApiResponse<PoItemResponse>.Failure("This purchase order is not belong to your account", statusCode: 403);
+
         if (po.Status != PoStatus.Draft)
             return ApiResponse<PoItemResponse>.Failure("Items can only be added while the purchase order is in Draft status.", statusCode: 400);
 
-        var product = await _productRepository.GetAsync(p => p.Id == request.ProductId, includes: q => q.Include(p => p.Uom));
+        var product = await _productRepository.GetAsync(p => p.Id == request.ProductId);
         if (product is null)
             return ApiResponse<PoItemResponse>.Failure("Product not found.", statusCode: 404);
 
@@ -249,29 +255,21 @@ public class PoService : IPoService
             PoId = po.Id,
             ProductId = request.ProductId,
             OrderedQty = request.OrderedQty,
-            UnitPrice = request.UnitPrice,
+            UnitPrice = product.UnitPrice,
             ReceivedQty = 0,
-            LineTotal = request.OrderedQty * request.UnitPrice,
+            LineTotal = request.OrderedQty * product.UnitPrice,
             CreatedBy = currentUserId
         };
 
         await _poItemRepository.CreateAsync(item);
 
-        po.TotalAmount = po.Items.Sum(i => i.LineTotal) + item.LineTotal;
+        po.TotalAmount = po.TotalAmount + item.LineTotal;
         po.ModifiedBy = currentUserId;
         po.ModifiedAt = DateTime.UtcNow;
         await _poRepository.SaveChangesAsync();
 
-        var response = new PoItemResponse
-        {
-            Id = item.Id,
-            ProductId = product.Id,
-            ProductName = product.Name,
-            OrderedQty = item.OrderedQty,
-            UnitPrice = item.UnitPrice,
-            ReceivedQty = item.ReceivedQty,
-            LineTotal = item.LineTotal
-        };
+        var response = _mapper.Map<PoItemResponse>(item);
+        response.ProductName = product.Name;
 
         return ApiResponse<PoItemResponse>.Success(response, "Item added to purchase order successfully.", statusCode: 201);
     }
@@ -286,7 +284,10 @@ public class PoService : IPoService
             return ApiResponse<PoItemResponse>.Failure("Purchase order not found.", statusCode: 404);
 
         if (po.WarehouseId != managerWarehouseId)
-            return ApiResponse<PoItemResponse>.Failure("Access denied. This purchase order does not belong to your warehouse.", statusCode: 403);
+            return ApiResponse<PoItemResponse>.Failure("This purchase order does not belong to your warehouse.", statusCode: 403);
+
+        if (po.CreatedBy != currentUserId)
+            return ApiResponse<PoItemResponse>.Failure("This purchase order is not belong to your account", statusCode: 403);
 
         if (po.Status != PoStatus.Draft)
             return ApiResponse<PoItemResponse>.Failure("Items can only be edited while the purchase order is in Draft status.", statusCode: 400);
@@ -296,7 +297,6 @@ public class PoService : IPoService
             return ApiResponse<PoItemResponse>.Failure("Purchase order item not found.", statusCode: 404);
 
         item.OrderedQty = request.OrderedQty ?? item.OrderedQty;
-        item.UnitPrice = request.UnitPrice ?? item.UnitPrice;
         item.LineTotal = item.OrderedQty * item.UnitPrice;
         item.ModifiedBy = currentUserId;
         item.ModifiedAt = DateTime.UtcNow;
@@ -307,18 +307,10 @@ public class PoService : IPoService
 
         await _poRepository.SaveChangesAsync();
 
-        var product = await _productRepository.GetAsync(p => p.Id == item.ProductId, includes: q => q.Include(p => p.Uom));
+        var product = await _productRepository.GetAsync(p => p.Id == item.ProductId);
 
-        var response = new PoItemResponse
-        {
-            Id = item.Id,
-            ProductId = item.ProductId,
-            ProductName = product!.Name,
-            OrderedQty = item.OrderedQty,
-            UnitPrice = item.UnitPrice,
-            ReceivedQty = item.ReceivedQty,
-            LineTotal = item.LineTotal
-        };
+        var response = _mapper.Map<PoItemResponse>(item);
+        response.ProductName = product!.Name;
 
         return ApiResponse<PoItemResponse>.Success(response, "Purchase order item updated successfully.", statusCode: 200);
     }
@@ -333,17 +325,18 @@ public class PoService : IPoService
             return ApiResponse<string>.Failure("Purchase order not found.", statusCode: 404);
 
         if (po.WarehouseId != managerWarehouseId)
-            return ApiResponse<string>.Failure("Access denied. This purchase order does not belong to your warehouse.", statusCode: 403);
+            return ApiResponse<string>.Failure("This purchase order does not belong to your warehouse.", statusCode: 403);
+
+        if (po.CreatedBy != currentUserId)
+            return ApiResponse<string>.Failure("This purchase order is not belong to your account", statusCode: 403);
 
         if (po.Status != PoStatus.Draft)
             return ApiResponse<string>.Failure("Items can only be removed while the purchase order is in Draft status.", statusCode: 400);
 
         var item = po.Items.FirstOrDefault(i => i.Id == itemId);
+
         if (item is null)
             return ApiResponse<string>.Failure("Purchase order item not found.", statusCode: 404);
-
-        if (po.Items.Count == 1)
-            return ApiResponse<string>.Failure("Cannot remove the last item. A purchase order must have at least one item. Delete the purchase order instead.", statusCode: 400);
 
         await _poItemRepository.DeleteAsync(item);
 
@@ -353,7 +346,7 @@ public class PoService : IPoService
         await _poRepository.SaveChangesAsync();
 
         return ApiResponse<string>.Success("Item removed from purchase order successfully.", statusCode: 200);
-    }
+    }   
 
     public async Task<ApiResponse<string>> SubmitPo(int id)
     {
@@ -365,7 +358,10 @@ public class PoService : IPoService
             return ApiResponse<string>.Failure("Purchase order not found.", statusCode: 404);
 
         if (po.WarehouseId != managerWarehouseId)
-            return ApiResponse<string>.Failure("Access denied. This purchase order does not belong to your warehouse.", statusCode: 403);
+            return ApiResponse<string>.Failure("This purchase order does not belong to your warehouse.", statusCode: 403);
+
+        if (po.CreatedBy != currentUserId)
+            return ApiResponse<string>.Failure("This Purchase Order is not belong to your account", statusCode: 403);
 
         if (po.Status != PoStatus.Draft)
             return ApiResponse<string>.Failure("Only draft purchase orders can be submitted.", statusCode: 400);
@@ -396,13 +392,13 @@ public class PoService : IPoService
             return ApiResponse<string>.Failure("Purchase order not found.", statusCode: 404);
 
         if (currentUserRole == "WarehouseManager" && po.WarehouseId != managerWarehouseId)
-            return ApiResponse<string>.Failure("Access denied. This purchase order does not belong to your warehouse.", statusCode: 403);
+            return ApiResponse<string>.Failure("This purchase order does not belong to your warehouse.", statusCode: 403);
 
         if (po.Status != PoStatus.Submitted)
             return ApiResponse<string>.Failure("Only submitted purchase orders can be approved.", statusCode: 400);
 
         if (po.SubmittedBy == currentUserId)
-            return ApiResponse<string>.Failure("You cannot approve a purchase order that you submitted yourself. Another manager or administrator must approve it.", statusCode: 403);
+            return ApiResponse<string>.Failure("You cannot approve a purchase order that you submitted. Another manager or administrator must approve it.", statusCode: 403);
 
         po.Status = PoStatus.Approved;
         po.ApprovedBy = currentUserId;
@@ -428,13 +424,13 @@ public class PoService : IPoService
             return ApiResponse<string>.Failure("Purchase order not found.", statusCode: 404);
 
         if (currentUserRole == "WarehouseManager" && po.WarehouseId != managerWarehouseId)
-            return ApiResponse<string>.Failure("Access denied. This purchase order does not belong to your warehouse.", statusCode: 403);
+            return ApiResponse<string>.Failure("This purchase order does not belong to your warehouse.", statusCode: 403);
 
         if (po.Status != PoStatus.Submitted)
             return ApiResponse<string>.Failure("Only submitted purchase orders can be rejected.", statusCode: 400);
 
         if (po.SubmittedBy == currentUserId)
-            return ApiResponse<string>.Failure("You cannot reject a purchase order that you submitted yourself. Another manager or administrator must review it.", statusCode: 403);
+            return ApiResponse<string>.Failure("You cannot reject a purchase order that you submitted . Another manager or administrator must reveiw it.", statusCode: 403);
 
         po.Status = PoStatus.Rejected;
         po.RejectedBy = currentUserId;
@@ -452,19 +448,19 @@ public class PoService : IPoService
     {
         int currentUserId = _currentUser.GetUserId();
         int? managerWarehouseId = _currentUser.GetWarehouseId();
-        var po = await _poRepository.GetAsync(x => x.Id == id, useNoTracking: false, includes: q => q.Include(p => p.GoodsReceipts));
+        var po = await _poRepository.GetAsync(x => x.Id == id, useNoTracking: false);
 
         if (po is null)
             return ApiResponse<string>.Failure("Purchase order not found.", statusCode: 404);
 
         if (po.WarehouseId != managerWarehouseId)
-            return ApiResponse<string>.Failure("Access denied. This purchase order does not belong to your warehouse.", statusCode: 403);
+            return ApiResponse<string>.Failure("This purchase order does not belong to your warehouse.", statusCode: 403);
 
-        if (po.Status != PoStatus.Draft && po.Status != PoStatus.Submitted)
-            return ApiResponse<string>.Failure("Only draft or submitted purchase orders can be cancelled.", statusCode: 400);
+        if (po.CreatedBy != currentUserId)
+            return ApiResponse<string>.Failure("This purchase order is not belong to your account", statusCode: 403);
 
-        if (po.GoodsReceipts.Count > 0)
-            return ApiResponse<string>.Failure("Cannot cancel a purchase order that has goods received against it.", statusCode: 400);
+        if (po.Status != PoStatus.Draft)
+            return ApiResponse<string>.Failure("Only draft purchase orders can be cancelled.", statusCode: 400);
 
         po.Status = PoStatus.Cancelled;
         po.CancelledBy = currentUserId;
