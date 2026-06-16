@@ -14,19 +14,25 @@ public class UserProfileService : IUserProfileService
     private readonly IUserRepository _userRepository;
     private readonly IInputNormalizer _inputNormalizer;
     private readonly IMapper _mapper;
+    private readonly ICurrentUserService _currentUser;
 
     public UserProfileService(
         IUserRepository userRepository,
         IInputNormalizer inputNormalizer,
-        IMapper mapper)
+        IMapper mapper,
+        ICurrentUserService currentUser
+        )
     {
         _userRepository = userRepository;
         _inputNormalizer = inputNormalizer;
         _mapper = mapper;
+        _currentUser = currentUser;
     }
 
-    public async Task<ApiResponse<UserProfileResponse>> GetProfile(int userId)
+    public async Task<ApiResponse<UserProfileResponse>> GetProfile()
     {
+        int userId = _currentUser.GetUserId();
+
         var user = await _userRepository.GetAsync(
             u => u.Id == userId,
             includes: q => q.Include(u => u.Warehouse));
@@ -38,8 +44,9 @@ public class UserProfileService : IUserProfileService
         return ApiResponse<UserProfileResponse>.Success(response);
     }
 
-    public async Task<ApiResponse<UserProfileResponse>> UpdateProfile(int userId, UpdateProfileRequest request)
+    public async Task<ApiResponse<UserProfileResponse>> UpdateProfile(UpdateProfileRequest request)
     {
+        int userId = _currentUser.GetUserId();
         request = _inputNormalizer.NormalizeObject(request);
 
         var user = await _userRepository.GetAsync(

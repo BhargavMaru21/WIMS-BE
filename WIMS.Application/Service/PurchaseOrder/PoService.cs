@@ -20,6 +20,7 @@ public class PoService : IPoService
     private readonly IMapper _mapper;
     private readonly IInputNormalizer _inputNormalizer;
     private readonly ICodeGeneratorService _codeGeneratorService;
+    private readonly ICurrentUserService _currentUser;
 
     public PoService(
         IPoRepository poRepository,
@@ -28,7 +29,9 @@ public class PoService : IPoService
         IProductRepository productRepository,
         IMapper mapper,
         IInputNormalizer inputNormalizer,
-        ICodeGeneratorService codeGeneratorService)
+        ICodeGeneratorService codeGeneratorService,
+        ICurrentUserService currentUser
+        )
     {
         _poRepository = poRepository;
         _poItemRepository = poItemRepository;
@@ -37,6 +40,7 @@ public class PoService : IPoService
         _mapper = mapper;
         _inputNormalizer = inputNormalizer;
         _codeGeneratorService = codeGeneratorService;
+        _currentUser = currentUser;
     }
 
     private void UpdateFlags(PoResponse response, PurchaseOrder po, int currentUserId)
@@ -45,9 +49,12 @@ public class PoService : IPoService
         response.CanApprove = po.Status == PoStatus.Submitted && po.SubmittedBy != currentUserId;
     }
 
-    public async Task<ApiResponse<PoResponse>> CreatePo(PoCreateRequest request, int? warehouseId, int createdByUserId)
+    public async Task<ApiResponse<PoResponse>> CreatePo(PoCreateRequest request)
     {
         request = _inputNormalizer.NormalizeObject(request);
+        int createdByUserId = _currentUser.GetUserId();
+        int? warehouseId = _currentUser.GetWarehouseId();
+
 
         if (warehouseId is null || warehouseId <= 0)
             return ApiResponse<PoResponse>.Failure("You are not assigned to any warehouse.", statusCode: 403);
@@ -88,8 +95,12 @@ public class PoService : IPoService
         return ApiResponse<PoResponse>.Success(response, "Purchase order created successfully.", statusCode: 201);
     }
 
-    public async Task<ApiResponse<PoResponse>> GetPoById(int id, int currentUserId, string currentUserRole, int? managerWarehouseId)
+    public async Task<ApiResponse<PoResponse>> GetPoById(int id)
     {
+        int currentUserId = _currentUser.GetUserId();
+        string currentUserRole = _currentUser.GetUserRole();
+        int? managerWarehouseId = _currentUser.GetWarehouseId();
+
         var po = await _poRepository.GetAsync(x => x.Id == id, includes: q => q
             .Include(p => p.Warehouse)
             .Include(p => p.SubmittedByUser)
@@ -113,9 +124,12 @@ public class PoService : IPoService
         return ApiResponse<PoResponse>.Success(response, statusCode: 200);
     }
 
-    public async Task<ApiResponse<PagedResult<PoResponse>>> GetPos(QueryParameters qp, int currentUserId, string currentUserRole, int? managerWarehouseId)
+    public async Task<ApiResponse<PagedResult<PoResponse>>> GetPos(QueryParameters qp)
     {
         qp = _inputNormalizer.NormalizeObject(qp);
+        int currentUserId = _currentUser.GetUserId();
+        string currentUserRole = _currentUser.GetUserRole();
+        int? managerWarehouseId = _currentUser.GetWarehouseId();
 
         if (currentUserRole == "WarehouseManager")
         {
@@ -158,9 +172,12 @@ public class PoService : IPoService
         return ApiResponse<PagedResult<PoResponse>>.Success(result, statusCode: 200);
     }
 
-    public async Task<ApiResponse<PoResponse>> UpdatePo(int id, PoUpdateRequest request, int currentUserId, int? managerWarehouseId)
+    public async Task<ApiResponse<PoResponse>> UpdatePo(int id, PoUpdateRequest request)
     {
         request = _inputNormalizer.NormalizeObject(request);
+        int currentUserId = _currentUser.GetUserId();
+        int? managerWarehouseId = _currentUser.GetWarehouseId();
+
 
         var po = await _poRepository.GetAsync(x => x.Id == id, useNoTracking: false, includes: q => q
             .Include(p => p.Warehouse)
@@ -202,8 +219,10 @@ public class PoService : IPoService
         return ApiResponse<PoResponse>.Success(response, "Purchase order updated successfully.", statusCode: 200);
     }
 
-    public async Task<ApiResponse<PoItemResponse>> AddItem(int poId, PoItemCreateRequest request, int currentUserId, int? managerWarehouseId)
+    public async Task<ApiResponse<PoItemResponse>> AddItem(int poId, PoItemCreateRequest request)
     {
+        int currentUserId = _currentUser.GetUserId();
+        int? managerWarehouseId = _currentUser.GetWarehouseId();
         var po = await _poRepository.GetAsync(x => x.Id == poId, useNoTracking: false, includes: q => q.Include(p => p.Items));
 
         if (po is null)
@@ -257,8 +276,10 @@ public class PoService : IPoService
         return ApiResponse<PoItemResponse>.Success(response, "Item added to purchase order successfully.", statusCode: 201);
     }
 
-    public async Task<ApiResponse<PoItemResponse>> UpdateItem(int poId, int itemId, PoItemUpdateRequest request, int currentUserId, int? managerWarehouseId)
+    public async Task<ApiResponse<PoItemResponse>> UpdateItem(int poId, int itemId, PoItemUpdateRequest request)
     {
+        int currentUserId = _currentUser.GetUserId();
+        int? managerWarehouseId = _currentUser.GetWarehouseId();
         var po = await _poRepository.GetAsync(x => x.Id == poId, useNoTracking: false, includes: q => q.Include(p => p.Items));
 
         if (po is null)
@@ -302,8 +323,10 @@ public class PoService : IPoService
         return ApiResponse<PoItemResponse>.Success(response, "Purchase order item updated successfully.", statusCode: 200);
     }
 
-    public async Task<ApiResponse<string>> RemoveItem(int poId, int itemId, int currentUserId, int? managerWarehouseId)
+    public async Task<ApiResponse<string>> RemoveItem(int poId, int itemId)
     {
+        int currentUserId = _currentUser.GetUserId();
+        int? managerWarehouseId = _currentUser.GetWarehouseId();
         var po = await _poRepository.GetAsync(x => x.Id == poId, useNoTracking: false, includes: q => q.Include(p => p.Items));
 
         if (po is null)
@@ -332,8 +355,10 @@ public class PoService : IPoService
         return ApiResponse<string>.Success("Item removed from purchase order successfully.", statusCode: 200);
     }
 
-    public async Task<ApiResponse<string>> SubmitPo(int id, int currentUserId, int? managerWarehouseId)
+    public async Task<ApiResponse<string>> SubmitPo(int id)
     {
+        int currentUserId = _currentUser.GetUserId();
+        int? managerWarehouseId = _currentUser.GetWarehouseId();
         var po = await _poRepository.GetAsync(x => x.Id == id, useNoTracking: false, includes: q => q.Include(p => p.Items));
 
         if (po is null)
@@ -360,8 +385,11 @@ public class PoService : IPoService
         return ApiResponse<string>.Success("Purchase order submitted for approval successfully.", statusCode: 200);
     }
 
-    public async Task<ApiResponse<string>> ApprovePo(int id, int currentUserId, string currentUserRole, int? managerWarehouseId)
+    public async Task<ApiResponse<string>> ApprovePo(int id)
     {
+        int currentUserId = _currentUser.GetUserId();
+        string currentUserRole = _currentUser.GetUserRole();
+        int? managerWarehouseId = _currentUser.GetWarehouseId();
         var po = await _poRepository.GetAsync(x => x.Id == id, useNoTracking: false);
 
         if (po is null)
@@ -387,8 +415,11 @@ public class PoService : IPoService
         return ApiResponse<string>.Success("Purchase order approved successfully.", statusCode: 200);
     }
 
-    public async Task<ApiResponse<string>> RejectPo(int id, PoRejectRequest request, int currentUserId, string currentUserRole, int? managerWarehouseId)
+    public async Task<ApiResponse<string>> RejectPo(int id, PoRejectRequest request)
     {
+        int currentUserId = _currentUser.GetUserId();
+        string currentUserRole = _currentUser.GetUserRole();
+        int? managerWarehouseId = _currentUser.GetWarehouseId();
         request = _inputNormalizer.NormalizeObject(request);
 
         var po = await _poRepository.GetAsync(x => x.Id == id, useNoTracking: false);
@@ -417,8 +448,10 @@ public class PoService : IPoService
         return ApiResponse<string>.Success("Purchase order rejected successfully.", statusCode: 200);
     }
 
-    public async Task<ApiResponse<string>> CancelPo(int id, int currentUserId, int? managerWarehouseId)
+    public async Task<ApiResponse<string>> CancelPo(int id)
     {
+        int currentUserId = _currentUser.GetUserId();
+        int? managerWarehouseId = _currentUser.GetWarehouseId();
         var po = await _poRepository.GetAsync(x => x.Id == id, useNoTracking: false, includes: q => q.Include(p => p.GoodsReceipts));
 
         if (po is null)

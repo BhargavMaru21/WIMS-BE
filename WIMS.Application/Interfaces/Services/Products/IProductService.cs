@@ -5,12 +5,12 @@ namespace WIMS.Application.Interfaces.Services.Products;
 
 public interface IProductService
 {
-    Task<ApiResponse<ProductResponse>> CreateProduct(ProductCreateRequest request, int createdByUserId);
-    Task<ApiResponse<string>> ImportFile(ImportDto request, int createdByUserId);
+    Task<ApiResponse<ProductResponse>> CreateProduct(ProductCreateRequest request);
+    Task<ApiResponse<string>> ImportFile(ImportDto request);
+    Task<byte[]> ExportProductsToExcel();
     Task<ApiResponse<ProductResponse>> GetProductById(int id);
-    Task<ApiResponse<List<ProductResponse>>> GetAllProducts();
     Task<ApiResponse<PagedResult<ProductResponse>>> GetProducts(QueryParameters qp);
-    Task<ApiResponse<ProductResponse>> UpdateProduct(int id, ProductUpdateRequest request, int modifiedByUserId);
-    Task<ApiResponse<string>> UpdateProductStatus(int id, ProductStatusUpdateRequest request, int modifiedByUserId);
-    Task<ApiResponse<string>> DeleteProduct(int id, int deletedByUserId);
+    Task<ApiResponse<ProductResponse>> UpdateProduct(int id, ProductUpdateRequest request);
+    Task<ApiResponse<string>> UpdateProductStatus(int id, ProductStatusUpdateRequest request);
+    Task<ApiResponse<string>> DeleteProduct(int id);
 }

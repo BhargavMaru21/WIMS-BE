@@ -19,114 +19,59 @@ public class ProductCategoryController : ControllerBase
         _categoryService = categoryService;
     }
 
-    private int GetCurrentUserId()
-        => int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-
     [HttpPost]
     [Authorize(Policy = "AdminOnly")]
-    public async Task<IActionResult> CreateCategory(ProductCategoryCreateRequest request)
+    public async Task<ApiResponse<ProductCategoryResponse>> CreateCategory(ProductCategoryCreateRequest request)
     {
-        var response = await _categoryService.CreateCategory(request, GetCurrentUserId());
-
-        if (!response.IsSuccess)
-            return BadRequest(response);
-
-        return StatusCode(201, response);
+        var response = await _categoryService.CreateCategory(request);
+        return response;
     }
 
     [HttpGet("{id:int}")]
     [Authorize(Policy = "AdminOnly")]
-    public async Task<IActionResult> GetCategoryById(int id)
+    public async Task<ApiResponse<ProductCategoryResponse>> GetCategoryById(int id)
     {
-        if (id <= 0)
-        {
-            return BadRequest(ApiResponse<ProductCategoryResponse>.Failure("Invalid ID.", statusCode: 400));
-        }
-
         var response = await _categoryService.GetCategoryById(id);
-
-        if (!response.IsSuccess)
-            return NotFound(response);
-
-        return Ok(response);
+        return response;
     }
 
     [HttpGet]
     [Authorize(Policy = "AdminOnly")]
-    public async Task<IActionResult> GetCategories([FromQuery] QueryParameters qp)
+    public async Task<ApiResponse<PagedResult<ProductCategoryResponse>>> GetCategories([FromQuery] QueryParameters qp)
     {
         var response = await _categoryService.GetCategories(qp);
-        return Ok(response);
+        return response;
     }
 
     [HttpGet("active")]
     [Authorize(Policy = "StockKeeperOrAbove")]
-    public async Task<IActionResult> GetActiveCategories()
+    public async Task<ApiResponse<List<ProductCategoryDropdownResponse>>> GetActiveCategories()
     {
         var response = await _categoryService.GetActiveCategories();
-        return Ok(response);
+        return response;
     }
 
     [HttpPatch("{id:int}")]
     [Authorize(Policy = "AdminOnly")]
-    public async Task<IActionResult> UpdateCategory(int id, ProductCategoryUpdateRequest request)
+    public async Task<ApiResponse<ProductCategoryResponse>> UpdateCategory(int id, ProductCategoryUpdateRequest request)
     {
-        if (id <= 0)
-        {
-            return BadRequest(ApiResponse<ProductCategoryResponse>.Failure("Invalid ID.", statusCode: 400));
-        }
-
-        var response = await _categoryService.UpdateCategory(id, request, GetCurrentUserId());
-
-        if (!response.IsSuccess)
-        {
-            if (response.StatusCode == 404)
-                return NotFound(response);
-            return BadRequest(response);
-        }
-
-        return Ok(response);
+        var response = await _categoryService.UpdateCategory(id, request);
+        return response;
     }
 
     [HttpPatch("{id:int}/status")]
     [Authorize(Policy = "AdminOnly")]
-    public async Task<IActionResult> UpdateCategoryStatus(int id, ProductCategoryStatusUpdateRequest request)
+    public async Task<ApiResponse<string>> UpdateCategoryStatus(int id, ProductCategoryStatusUpdateRequest request)
     {
-        if (id <= 0)
-        {
-            return BadRequest(ApiResponse<string>.Failure("Invalid ID.", statusCode: 400));
-        }
-
-        var response = await _categoryService.UpdateCategoryStatus(id, request, GetCurrentUserId());
-
-        if (!response.IsSuccess)
-        {
-            if (response.StatusCode == 404)
-                return NotFound(response);
-            return BadRequest(response);
-        }
-
-        return Ok(response);
+        var response = await _categoryService.UpdateCategoryStatus(id, request);
+        return response;
     }
 
     [HttpDelete("{id:int}")]
     [Authorize(Policy = "AdminOnly")]
-    public async Task<IActionResult> DeleteCategory(int id)
+    public async Task<ApiResponse<string>> DeleteCategory(int id)
     {
-        if (id <= 0)
-        {
-            return BadRequest(ApiResponse<ProductCategoryResponse>.Failure("Invalid ID.", statusCode: 400));
-        }
-
-        var response = await _categoryService.DeleteCategory(id, GetCurrentUserId());
-
-        if (!response.IsSuccess)
-        {
-            if (response.StatusCode == 404)
-                return NotFound(response);
-            return BadRequest(response);
-        }
-
-        return Ok(response);
+        var response = await _categoryService.DeleteCategory(id);
+        return response;
     }
 }

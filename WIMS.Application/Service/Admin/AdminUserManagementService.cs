@@ -18,6 +18,7 @@ public class AdminUserManagementService : IAdminUserManagementService
     private readonly IEmailService _emailService;
     private readonly IMapper _mapper;
     private readonly IInputNormalizer _inputNormalizer;
+    private readonly ICurrentUserService _currentUser;
     private static readonly UserRole[] _rolesRequiringWarehouse =
         [UserRole.WarehouseManager, UserRole.StockKeeper];
 
@@ -25,7 +26,15 @@ public class AdminUserManagementService : IAdminUserManagementService
         [UserRole.Administrator, UserRole.Viewer];
 
 
-    public AdminUserManagementService(IUserRepository userRepository, IPasswordHasher passwordHasher, IWarehouseRepository warehouseRepo, IEmailService emailService, IMapper mapper, IInputNormalizer inputNormalizer)
+    public AdminUserManagementService(
+        IUserRepository userRepository,
+        IPasswordHasher passwordHasher,
+        IWarehouseRepository warehouseRepo,
+        IEmailService emailService,
+        IMapper mapper,
+        IInputNormalizer inputNormalizer,
+        ICurrentUserService currentUser
+        )
     {
         _userRepository = userRepository;
         _passwordHasher = passwordHasher;
@@ -33,11 +42,12 @@ public class AdminUserManagementService : IAdminUserManagementService
         _warehouseRepo = warehouseRepo;
         _mapper = mapper;
         _inputNormalizer = inputNormalizer;
+        _currentUser = currentUser;
     }
 
-    public async Task<ApiResponse<UserResponseDto>> CreateUser(CreateUserRequest request, int createdByUserId)
+    public async Task<ApiResponse<UserResponseDto>> CreateUser(CreateUserRequest request)
     {
-
+        int createdByUserId = _currentUser.GetUserId();
         request = _inputNormalizer.NormalizeObject(request);
 
         var emailTaken = await _userRepository.IsEmailTakenAsync(request.Email);
@@ -129,6 +139,9 @@ public class AdminUserManagementService : IAdminUserManagementService
 
     public async Task<ApiResponse<UserResponseDto>> GetUserById(int userId)
     {
+        if (userId <= 0)
+            return ApiResponse<UserResponseDto>.Failure("Invalid ID", statusCode: 400);
+
         var user = await _userRepository.GetAsync(
             u => u.Id == userId,
             includes: q => q.Include(u => u.Warehouse));
@@ -141,8 +154,13 @@ public class AdminUserManagementService : IAdminUserManagementService
         return ApiResponse<UserResponseDto>.Success(response);
     }
 
-    public async Task<ApiResponse<UserResponseDto>> UpdateUserStatus(int userId, UpdateUserStatusRequest request, int modifiedByUserId)
+    public async Task<ApiResponse<UserResponseDto>> UpdateUserStatus(int userId, UpdateUserStatusRequest request)
     {
+        if (userId <= 0)
+            return ApiResponse<UserResponseDto>.Failure("Invalid ID", statusCode: 400);
+
+        int modifiedByUserId = _currentUser.GetUserId();
+
         var user = await _userRepository.GetAsync(
             u => u.Id == userId,
             useNoTracking: false,
@@ -197,8 +215,13 @@ public class AdminUserManagementService : IAdminUserManagementService
             $"User {request.Status.ToString().ToLower()} successfully.");
     }
 
-    public async Task<ApiResponse<UserResponseDto>> UpdateUserRole(int userId, UpdateUserRoleRequest request, int modifiedByUserId)
+    public async Task<ApiResponse<UserResponseDto>> UpdateUserRole(int userId, UpdateUserRoleRequest request)
     {
+        if (userId <= 0)
+            return ApiResponse<UserResponseDto>.Failure("Invalid ID", statusCode: 400);
+
+        int modifiedByUserId = _currentUser.GetUserId();
+
         var user = await _userRepository.GetAsync(
             u => u.Id == userId,
             useNoTracking: false,
@@ -260,8 +283,13 @@ public class AdminUserManagementService : IAdminUserManagementService
             "User role updated successfully.");
     }
 
-    public async Task<ApiResponse<UserResponseDto>> UpdateUserWarehouse(int userId, UpdateUserWarehouseRequest request, int modifiedByUserId)
+    public async Task<ApiResponse<UserResponseDto>> UpdateUserWarehouse(int userId, UpdateUserWarehouseRequest request)
     {
+        if (userId <= 0)
+            return ApiResponse<UserResponseDto>.Failure("Invalid ID", statusCode: 400);
+
+        int modifiedByUserId = _currentUser.GetUserId();
+
         var user = await _userRepository.GetAsync(
             u => u.Id == userId,
             useNoTracking: false,
@@ -304,8 +332,13 @@ public class AdminUserManagementService : IAdminUserManagementService
         return ApiResponse<UserResponseDto>.Success(response, "Warehouse assignment updated successfully.");
     }
 
-    public async Task<ApiResponse<string>> Deleteuser(int userId, int deletedByUserId)
+    public async Task<ApiResponse<string>> Deleteuser(int userId)
     {
+        if (userId <= 0)
+            return ApiResponse<string>.Failure("Invalid ID", statusCode: 400);
+
+        int deletedByUserId = _currentUser.GetUserId();
+
         var user = await _userRepository.GetAsync(u => u.Id == userId, useNoTracking: false);
 
         if (user is null)

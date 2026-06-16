@@ -5,11 +5,11 @@ namespace WIMS.Application.Interfaces.Services.ProductCategory;
 
 public interface IProductCategoryService
 {
-    Task<ApiResponse<ProductCategoryResponse>> CreateCategory(ProductCategoryCreateRequest request, int createdByUserId);
+    Task<ApiResponse<ProductCategoryResponse>> CreateCategory(ProductCategoryCreateRequest request);
     Task<ApiResponse<ProductCategoryResponse>> GetCategoryById(int id);
     Task<ApiResponse<PagedResult<ProductCategoryResponse>>> GetCategories(QueryParameters qp);
     Task<ApiResponse<List<ProductCategoryDropdownResponse>>> GetActiveCategories();
-    Task<ApiResponse<ProductCategoryResponse>> UpdateCategory(int id, ProductCategoryUpdateRequest request, int modifiedByUserId);
-    Task<ApiResponse<string>> UpdateCategoryStatus(int id, ProductCategoryStatusUpdateRequest request, int modifiedByUserId);
-    Task<ApiResponse<string>> DeleteCategory(int id, int deletedBy);
+    Task<ApiResponse<ProductCategoryResponse>> UpdateCategory(int id, ProductCategoryUpdateRequest request);
+    Task<ApiResponse<string>> UpdateCategoryStatus(int id, ProductCategoryStatusUpdateRequest request);
+    Task<ApiResponse<string>> DeleteCategory(int id);
 }
