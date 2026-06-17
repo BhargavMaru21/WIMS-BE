@@ -1,6 +1,7 @@
 using WIMS.Application.DTOs;
 using WIMS.Application.DTOs.Profile;
 using WIMS.Application.DTOs.PurchaseOrder;
+using WIMS.Domain.Enums;
 
 namespace WIMS.Application.Interfaces.Services.PurchaseOrder;
 
@@ -15,9 +16,5 @@ public interface IPoService
     Task<ApiResponse<PoItemResponse>> AddItem(int poId, PoItemCreateRequest request);
     Task<ApiResponse<PoItemResponse>> UpdateItem(int poId, int itemId, PoItemUpdateRequest request);
     Task<ApiResponse<string>> RemoveItem(int poId, int itemId);
- 
-    Task<ApiResponse<string>> SubmitPo(int id);
-    Task<ApiResponse<string>> ApprovePo(int id);
-    Task<ApiResponse<string>> RejectPo(int id, PoRejectRequest request);
-    Task<ApiResponse<string>> CancelPo(int id);
+    Task<ApiResponse<string>>  UpdateStatus(int id, PoStatusUpdateRequest request);
 }

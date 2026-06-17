@@ -107,7 +107,7 @@ public class PoService : IPoService
             .Include(p => p.ApprovedByUser)
             .Include(p => p.RejectedByUser)
             .Include(p => p.CancelledByUser)
-            .Include(p => p.Items));
+            .Include(p => p.Items).ThenInclude(p => p.Product));
 
         if (po is null)
             return ApiResponse<PoResponse>.Failure("Purchase order not found.", statusCode: 404);
@@ -149,7 +149,7 @@ public class PoService : IPoService
             .Include(p => p.ApprovedByUser)
             .Include(p => p.RejectedByUser)
             .Include(p => p.CancelledByUser)
-            .Include(p => p.Items)
+            .Include(p => p.Items).ThenInclude(p => p.Product)
         );
 
         var items = paged.Items.Select(po =>
@@ -346,12 +346,28 @@ public class PoService : IPoService
         await _poRepository.SaveChangesAsync();
 
         return ApiResponse<string>.Success("Item removed from purchase order successfully.", statusCode: 200);
-    }   
+    }
 
-    public async Task<ApiResponse<string>> SubmitPo(int id)
+    public async Task<ApiResponse<string>> UpdateStatus(int id, PoStatusUpdateRequest request)
     {
         int currentUserId = _currentUser.GetUserId();
         int? managerWarehouseId = _currentUser.GetWarehouseId();
+
+        var response = request.Status switch
+        {
+            PoStatus.Submitted => await handleSubmit(id, currentUserId, managerWarehouseId),
+            PoStatus.Approved => await handleApprove(id, currentUserId, managerWarehouseId),
+            PoStatus.Rejected => await handleReject(id, currentUserId, managerWarehouseId, request.RejectionReason!),
+            PoStatus.Cancelled => await handleCancel(id, currentUserId, managerWarehouseId),
+
+            _ => throw new Exception("Invalid Status")
+        };
+
+        return response;
+    }
+
+    private async Task<ApiResponse<string>> handleSubmit(int id, int currentUserId, int? managerWarehouseId)
+    {
         var po = await _poRepository.GetAsync(x => x.Id == id, useNoTracking: false, includes: q => q.Include(p => p.Items));
 
         if (po is null)
@@ -381,11 +397,9 @@ public class PoService : IPoService
         return ApiResponse<string>.Success("Purchase order submitted for approval successfully.", statusCode: 200);
     }
 
-    public async Task<ApiResponse<string>> ApprovePo(int id)
+    private async Task<ApiResponse<string>> handleApprove(int id, int currentUserId, int? managerWarehouseId)
     {
-        int currentUserId = _currentUser.GetUserId();
         string currentUserRole = _currentUser.GetUserRole();
-        int? managerWarehouseId = _currentUser.GetWarehouseId();
         var po = await _poRepository.GetAsync(x => x.Id == id, useNoTracking: false);
 
         if (po is null)
@@ -398,7 +412,7 @@ public class PoService : IPoService
             return ApiResponse<string>.Failure("Only submitted purchase orders can be approved.", statusCode: 400);
 
         if (po.SubmittedBy == currentUserId)
-            return ApiResponse<string>.Failure("You cannot approve a purchase order that you submitted. Another manager or administrator must approve it.", statusCode: 403);
+            return ApiResponse<string>.Failure("You cannot approve a purchase order that you submitted. Another manager or admin approve it.", statusCode: 403);
 
         po.Status = PoStatus.Approved;
         po.ApprovedBy = currentUserId;
@@ -411,12 +425,10 @@ public class PoService : IPoService
         return ApiResponse<string>.Success("Purchase order approved successfully.", statusCode: 200);
     }
 
-    public async Task<ApiResponse<string>> RejectPo(int id, PoRejectRequest request)
+    private async Task<ApiResponse<string>> handleReject(int id, int currentUserId, int? managerWarehouseId, string reason)
     {
-        int currentUserId = _currentUser.GetUserId();
         string currentUserRole = _currentUser.GetUserRole();
-        int? managerWarehouseId = _currentUser.GetWarehouseId();
-        request = _inputNormalizer.NormalizeObject(request);
+        reason = _inputNormalizer.Normalize(reason);
 
         var po = await _poRepository.GetAsync(x => x.Id == id, useNoTracking: false);
 
@@ -430,12 +442,12 @@ public class PoService : IPoService
             return ApiResponse<string>.Failure("Only submitted purchase orders can be rejected.", statusCode: 400);
 
         if (po.SubmittedBy == currentUserId)
-            return ApiResponse<string>.Failure("You cannot reject a purchase order that you submitted . Another manager or administrator must reveiw it.", statusCode: 403);
+            return ApiResponse<string>.Failure("You cannot reject a purchase order that you submitted . Another manager or admin do it.", statusCode: 403);
 
         po.Status = PoStatus.Rejected;
         po.RejectedBy = currentUserId;
         po.RejectedAt = DateTime.UtcNow;
-        po.RejectionReason = request.RejectionReason;
+        po.RejectionReason = reason;
         po.ModifiedBy = currentUserId;
         po.ModifiedAt = DateTime.UtcNow;
 
@@ -444,10 +456,8 @@ public class PoService : IPoService
         return ApiResponse<string>.Success("Purchase order rejected successfully.", statusCode: 200);
     }
 
-    public async Task<ApiResponse<string>> CancelPo(int id)
+    private async Task<ApiResponse<string>> handleCancel(int id, int currentUserId, int? managerWarehouseId)
     {
-        int currentUserId = _currentUser.GetUserId();
-        int? managerWarehouseId = _currentUser.GetWarehouseId();
         var po = await _poRepository.GetAsync(x => x.Id == id, useNoTracking: false);
 
         if (po is null)
@@ -459,8 +469,8 @@ public class PoService : IPoService
         if (po.CreatedBy != currentUserId)
             return ApiResponse<string>.Failure("This purchase order is not belong to your account", statusCode: 403);
 
-        if (po.Status != PoStatus.Draft)
-            return ApiResponse<string>.Failure("Only draft purchase orders can be cancelled.", statusCode: 400);
+        if (po.Status != PoStatus.Draft && po.Status != PoStatus.Submitted)
+            return ApiResponse<string>.Failure("Only draft & submitted purchase orders can be cancelled.", statusCode: 400);
 
         po.Status = PoStatus.Cancelled;
         po.CancelledBy = currentUserId;

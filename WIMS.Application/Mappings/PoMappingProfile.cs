@@ -9,7 +9,7 @@ public class PoMappingProfile : Profile
     public PoMappingProfile()
     {
         CreateMap<PurchaseOrderItem, PoItemResponse>()
-            .ForMember(dest => dest.ProductName, opt => opt.Ignore());
+            .ForMember(dest => dest.ProductName, opt => opt.MapFrom(src => src.Product.Name));
  
         CreateMap<PurchaseOrder, PoResponse>()
             .ForMember(dest => dest.Status, opt => opt.MapFrom(src => src.Status.ToString()))

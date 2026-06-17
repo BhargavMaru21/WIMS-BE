@@ -8,7 +8,7 @@ using WIMS.Application.Interfaces.Services.PurchaseOrder;
 namespace WIMS.Api.Controllers.PurchaseOrder;
 
 [ApiController]
-[Route("api/manager/purchase-orders")]
+[Route("api/purchase-orders")]
 [Authorize(Policy = "ManagerOrAbove")]
 public class PurchaseOrderController : ControllerBase
 {
@@ -69,31 +69,11 @@ public class PurchaseOrderController : ControllerBase
         return response;
     }
 
-    [HttpPatch("{id:int}/submit")]
-    public async Task<ApiResponse<string>> SubmitPo(int id)
+    [HttpPatch("{id:int}/status")]
+    public async Task<ApiResponse<string>> UpdateStatus(int id,PoStatusUpdateRequest request)
     {
-        var response = await _poService.SubmitPo(id);
+        var response = await _poService.UpdateStatus(id,request);
         return response;
     }
 
-    [HttpPatch("{id:int}/approve")]
-    public async Task<ApiResponse<string>> ApprovePo(int id)
-    {
-        var response = await _poService.ApprovePo(id);
-        return response;
-    }
-
-    [HttpPatch("{id:int}/reject")]
-    public async Task<ApiResponse<string>> RejectPo(int id, PoRejectRequest request)
-    {
-        var response = await _poService.RejectPo(id, request);
-        return response;
-    }
-
-    [HttpPatch("{id:int}/cancel")]
-    public async Task<ApiResponse<string>> CancelPo(int id)
-    {
-        var response = await _poService.CancelPo(id);
-        return response;
-    }
 }

@@ -1,6 +1,7 @@
 using FluentValidation;
 using WIMS.Application.CommonServices;
 using WIMS.Application.DTOs.PurchaseOrder;
+using WIMS.Domain.Enums;
 
 namespace WIMS.Application.Validators.PurchaseOrder;
 
@@ -74,13 +75,22 @@ public class PoItemUpdateRequestValidator : AbstractValidator<PoItemUpdateReques
     }
 }
 
-public class PoRejectRequestValidator : AbstractValidator<PoRejectRequest>
+public class PoStatusUpdateRequestValidator : AbstractValidator<PoStatusUpdateRequest>
 {
-    public PoRejectRequestValidator()
+    public PoStatusUpdateRequestValidator()
     {
+        RuleFor(x => x.Status)
+            .NotEmpty().WithMessage("Status is required")
+            .Must(status => status == PoStatus.Submitted ||
+                            status == PoStatus.Approved ||
+                            status == PoStatus.Rejected ||
+                            status == PoStatus.Cancelled)
+            .WithMessage("Status must be Submitted,Approved,Rejected,Cancelled");
+
         RuleFor(x => x.RejectionReason)
             .NotEmpty().WithMessage("Rejection reason is required")
             .MinimumLength(5).WithMessage("Rejection reason must be at least 5 characters.")
-            .MaximumLength(500).WithMessage("Rejection reason must not exceed 500 characters.");
+            .MaximumLength(500).WithMessage("Rejection reason must not exceed 500 characters.")
+            .When(x => x.Status == PoStatus.Rejected);
     }
 }
