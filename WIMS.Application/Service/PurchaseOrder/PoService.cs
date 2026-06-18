@@ -1,5 +1,6 @@
 using AutoMapper;
 using DocumentFormat.OpenXml.Bibliography;
+using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 using WIMS.Application.DTOs;
 using WIMS.Application.DTOs.PurchaseOrder;
@@ -21,6 +22,7 @@ public class PoService : IPoService
     private readonly IInputNormalizer _inputNormalizer;
     private readonly ICodeGeneratorService _codeGeneratorService;
     private readonly ICurrentUserService _currentUser;
+    private readonly IValidator<PoItemCreateRequest> _validator;
 
     public PoService(
         IPoRepository poRepository,
@@ -30,7 +32,8 @@ public class PoService : IPoService
         IMapper mapper,
         IInputNormalizer inputNormalizer,
         ICodeGeneratorService codeGeneratorService,
-        ICurrentUserService currentUser
+        ICurrentUserService currentUser,
+        IValidator<PoItemCreateRequest> validator
         )
     {
         _poRepository = poRepository;
@@ -41,6 +44,7 @@ public class PoService : IPoService
         _inputNormalizer = inputNormalizer;
         _codeGeneratorService = codeGeneratorService;
         _currentUser = currentUser;
+        _validator = validator;
     }
 
     private void UpdateFlags(PoResponse response, PurchaseOrder po, int currentUserId)
@@ -68,31 +72,80 @@ public class PoService : IPoService
             return ApiResponse<PoResponse>.Failure("Cannot create a purchase order for an inactive warehouse.", statusCode: 400);
 
 
-        var entity = _mapper.Map<PurchaseOrder>(request);
-        entity.WarehouseId = warehouseId.Value;
-        entity.Status = PoStatus.Draft;
-        entity.CreatedBy = createdByUserId;
+        await _poRepository.BeginTransactionAsync();
 
-        var created = await _poRepository.CreateAsync(entity);
+        try
+        {
+            var entity = _mapper.Map<PurchaseOrder>(request);
+            entity.WarehouseId = warehouseId.Value;
+            entity.Status = PoStatus.Draft;
+            entity.CreatedBy = createdByUserId;
 
-        created.PoNumber = _codeGeneratorService.GenerateCode("purchaseorder", created.Id);
-        await _poRepository.SaveChangesAsync();
+            var created = await _poRepository.CreateAsync(entity);
 
-        var poWithIncludes = await _poRepository.GetAsync(
-            x => x.Id == created.Id,
-            includes: q => q
-            .Include(p => p.Warehouse)
-            .Include(p => p.SubmittedByUser)
-            .Include(p => p.ApprovedByUser)
-            .Include(p => p.RejectedByUser)
-            .Include(p => p.CancelledByUser)
-            .Include(p => p.Items));
+            created.PoNumber = _codeGeneratorService.GenerateCode("purchaseorder", created.Id);
+            await _poRepository.SaveChangesAsync();
 
-        var response = _mapper.Map<PoResponse>(poWithIncludes);
-        UpdateFlags(response, poWithIncludes!, createdByUserId);
+            var ListOfItems = request.ItemList;
 
-        await _poRepository.CommitTransactionAsync();
-        return ApiResponse<PoResponse>.Success(response, "Purchase order created successfully.", statusCode: 201);
+            foreach (var item in ListOfItems)
+            {
+                var validationResult = await _validator.ValidateAsync(item);
+
+                if (!validationResult.IsValid)
+                {
+                    await _poRepository.RollbackTransactionAsync();
+                    var errors = validationResult.Errors.Select(e => e.ErrorMessage);
+                    return ApiResponse<PoResponse>.Failure($"{string.Join(" ", errors)}");
+                }
+
+                var product = await _productRepository.GetAsync(p => p.Id == item.ProductId);
+
+                if (product is null)
+                    return ApiResponse<PoResponse>.Failure("Product not found.", statusCode: 404);
+
+                if (product.Status == EntityStatus.Inactive)
+                    return ApiResponse<PoResponse>.Failure("Cannot add an inactive product to a purchase order.", statusCode: 400);
+
+                var orderItem = new PurchaseOrderItem
+                {
+                    PoId = created.Id,
+                    ProductId = item.ProductId,
+                    OrderedQty = item.OrderedQty,
+                    UnitPrice = product.UnitPrice,
+                    ReceivedQty = 0,
+                    LineTotal = item.OrderedQty * product.UnitPrice,
+                    CreatedBy = createdByUserId
+                };
+
+                await _poItemRepository.CreateAsync(orderItem);
+
+                created.TotalAmount = created.TotalAmount + orderItem.LineTotal;
+                await _poRepository.SaveChangesAsync();
+            }
+
+            var poWithIncludes = await _poRepository.GetAsync(
+                x => x.Id == created.Id,
+                includes: q => q
+                .Include(p => p.Warehouse)
+                .Include(p => p.SubmittedByUser)
+                .Include(p => p.ApprovedByUser)
+                .Include(p => p.RejectedByUser)
+                .Include(p => p.CancelledByUser)
+                .Include(p => p.Items).ThenInclude(p => p.Product));
+
+            var response = _mapper.Map<PoResponse>(poWithIncludes);
+            UpdateFlags(response, poWithIncludes!, createdByUserId);
+
+            await _poRepository.CommitTransactionAsync();
+            return ApiResponse<PoResponse>.Success(response, "Purchase order created successfully.", statusCode: 201);
+        }
+        catch (Exception)
+        {
+            await _poRepository.RollbackTransactionAsync();
+            return ApiResponse<PoResponse>.Failure("an error occuired during creation of Purchase Order");
+        }
+
     }
 
     public async Task<ApiResponse<PoResponse>> GetPoById(int id)

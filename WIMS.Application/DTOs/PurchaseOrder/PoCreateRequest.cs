@@ -6,4 +6,5 @@ public class PoCreateRequest
     public string? SupplierContact { get; set; }
     public required DateOnly ExpectedDelivery { get; set; }
     public string? Notes { get; set; }
+    public required List<PoItemCreateRequest> ItemList {get; set;}
 }
