@@ -150,6 +150,7 @@ public class PoService : IPoService
             .Include(p => p.RejectedByUser)
             .Include(p => p.CancelledByUser)
             .Include(p => p.Items).ThenInclude(p => p.Product)
+            .Where(po => po.Status != PoStatus.Draft || po.CreatedBy == currentUserId)
         );
 
         var items = paged.Items.Select(po =>
@@ -159,12 +160,10 @@ public class PoService : IPoService
             return summary;
         }).ToList();
 
-        var FilteredItem = items.Where(x => x.Status != PoStatus.Draft.ToString() || (x.Status == PoStatus.Draft.ToString() && x.CreatedBy == currentUserId)).ToList();
-
         var result = new PagedResult<PoResponse>
         {
-            Items = FilteredItem,
-            TotalCount = FilteredItem.Count(),
+            Items = items,
+            TotalCount = paged.TotalCount,
             PageSize = paged.PageSize,
             PageNumber = paged.PageNumber
         };
@@ -345,7 +344,7 @@ public class PoService : IPoService
         po.ModifiedAt = DateTime.UtcNow;
         await _poRepository.SaveChangesAsync();
 
-        return ApiResponse<string>.Success("Item removed from purchase order successfully.", statusCode: 200);
+        return ApiResponse<string>.Success("Item removed.", statusCode: 200);
     }
 
     public async Task<ApiResponse<string>> UpdateStatus(int id, PoStatusUpdateRequest request)
