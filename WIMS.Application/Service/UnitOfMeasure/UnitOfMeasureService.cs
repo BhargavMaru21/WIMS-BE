@@ -15,16 +15,19 @@ public class UnitOfMeasureService : IUnitOfMeasureService
     private readonly IUnitOfMeasureRepository _unitOfMeasureRepository;
     private readonly IInputNormalizer _inputNormalizer;
     private readonly IMapper _mapper;
+    private readonly ICurrentUserService _currentUser;
 
-    public UnitOfMeasureService(IUnitOfMeasureRepository unitOfMeasureRepository, IInputNormalizer inputNormalizer, IMapper mapper)
+    public UnitOfMeasureService(IUnitOfMeasureRepository unitOfMeasureRepository, IInputNormalizer inputNormalizer, IMapper mapper, ICurrentUserService currentUser)
     {
         _unitOfMeasureRepository = unitOfMeasureRepository;
         _inputNormalizer = inputNormalizer;
         _mapper = mapper;
+        _currentUser = currentUser;
     }
 
-    public async Task<ApiResponse<UnitResponse>> CreateUnit(CreateUnitRequest request, int createdByUserId)
+    public async Task<ApiResponse<UnitResponse>> CreateUnit(CreateUnitRequest request)
     {
+        int createdByUserId = _currentUser.GetUserId();
         request = _inputNormalizer.NormalizeObject(request);
 
         if (await _unitOfMeasureRepository.ExistsAsync(x => x.Name.ToLower() == request.Name.ToLower()))
@@ -58,6 +61,9 @@ public class UnitOfMeasureService : IUnitOfMeasureService
 
     public async Task<ApiResponse<UnitResponse>> UpdateUnit(int id, UpdateUnitRequest request)
     {
+        if (id <= 0)
+            return ApiResponse<UnitResponse>.Failure("Invalid ID", statusCode: 400);
+            
         request = _inputNormalizer.NormalizeObject(request);
 
         var uom = await _unitOfMeasureRepository.GetAsync(x => x.Id == id, useNoTracking: false);
@@ -84,22 +90,25 @@ public class UnitOfMeasureService : IUnitOfMeasureService
 
     public async Task<ApiResponse<string>> DeleteUnit(int id)
     {
-        var uom = await _unitOfMeasureRepository.GetAsync(x => x.Id == id,useNoTracking : false);
+        if (id <= 0)
+            return ApiResponse<string>.Failure("Invalid ID", statusCode: 400);
 
-        if(uom is null)
+        var uom = await _unitOfMeasureRepository.GetAsync(x => x.Id == id, useNoTracking: false);
+
+        if (uom is null)
         {
-            return ApiResponse<string>.Failure("Unit not Found",statusCode:404);
+            return ApiResponse<string>.Failure("Unit not Found", statusCode: 404);
         }
 
-        if(await _unitOfMeasureRepository.IsAssignedToProductAsync(uom.Id))
+        if (await _unitOfMeasureRepository.IsAssignedToProductAsync(uom.Id))
         {
-            return ApiResponse<string>.Failure("Unit is Assigned to Product. It can not be delete",statusCode:400);
+            return ApiResponse<string>.Failure("Unit is Assigned to Product. It can not be delete", statusCode: 400);
         }
 
-        if(await _unitOfMeasureRepository.DeleteAsync(uom))
-            return ApiResponse<string>.Success("Unit Deleted Successfully",statusCode:200);   
+        if (await _unitOfMeasureRepository.DeleteAsync(uom))
+            return ApiResponse<string>.Success("Unit Deleted Successfully", statusCode: 200);
 
-        return ApiResponse<string>.Failure("Error occur while Deleting Unit",statusCode:500);
+        return ApiResponse<string>.Failure("Error occur while Deleting Unit", statusCode: 500);
     }
 
 }

@@ -19,8 +19,8 @@ public class BinService : IBinService
     private readonly IMapper _mapper;
     private readonly IInputNormalizer _inputNormalizer;
     private readonly ICodeGeneratorService _codeGeneratorService;
-    private readonly IAuditService _auditService;
     private readonly ZoneService _zoneService;
+    private readonly ICurrentUserService _currentUser;
 
     public BinService(
         IBinRepository binRepository,
@@ -28,20 +28,22 @@ public class BinService : IBinService
         IMapper mapper,
         IInputNormalizer inputNormalizer,
         ICodeGeneratorService codeGeneratorService,
-        IAuditService auditService,
-        ZoneService zoneService)
+        ZoneService zoneService,
+        ICurrentUserService currentUser
+        )
     {
         _binRepository = binRepository;
         _zoneRepository = zoneRepository;
         _mapper = mapper;
         _inputNormalizer = inputNormalizer;
         _codeGeneratorService = codeGeneratorService;
-        _auditService = auditService;
         _zoneService = zoneService;
+        _currentUser = currentUser;
     }
 
-    public async Task<ApiResponse<BinResponse>> CreateBin(BinCreateRequest request, int createdByUserId)
+    public async Task<ApiResponse<BinResponse>> CreateBin(BinCreateRequest request)
     {
+        int createdByUserId = _currentUser.GetUserId();
         request = _inputNormalizer.NormalizeObject(request);
 
         var zone = await _zoneRepository.GetAsync(
@@ -60,48 +62,31 @@ public class BinService : IBinService
         if (nameExists)
             return ApiResponse<BinResponse>.Failure("A bin with this name already exists in the selected zone.", statusCode: 400);
 
-        await _binRepository.BeginTransactionAsync();
-        try
-        {
-            var binEntity = _mapper.Map<Bin>(request);
-            binEntity.CreatedBy = createdByUserId;
+        var binEntity = _mapper.Map<Bin>(request);
+        binEntity.CreatedBy = createdByUserId;
 
-            var createdBin = await _binRepository.CreateAsync(binEntity);
+        var createdBin = await _binRepository.CreateAsync(binEntity);
 
-            createdBin.Code = _codeGeneratorService.GenerateCode("bin", createdBin.Id);
-            await _binRepository.SaveChangesAsync();
+        createdBin.Code = _codeGeneratorService.GenerateCode("bin", createdBin.Id);
+        await _binRepository.SaveChangesAsync();
 
-            var bin = await _binRepository.GetAsync(
-                b => b.Id == createdBin.Id,
-                includes: q => q
-                    .Include(b => b.Zone)
-                    .ThenInclude(z => z.Warehouse));
+        var bin = await _binRepository.GetAsync(
+            b => b.Id == createdBin.Id,
+            includes: q => q
+                .Include(b => b.Zone)
+                .ThenInclude(z => z.Warehouse));
 
-            var response = _mapper.Map<BinResponse>(bin);
+        var response = _mapper.Map<BinResponse>(bin);
 
-            await _auditService.LogAsync(
-                action: AuditActions.Created,
-                entityName: "Bin",
-                entityId: createdBin.Id.ToString(),
-                performedBy: createdByUserId,
-                newValue: response);
-
-            await _binRepository.CommitTransactionAsync();
-            return ApiResponse<BinResponse>.Success(response, "Bin created successfully.", statusCode: 201);
-        }
-        catch (Exception)
-        {
-            await _binRepository.RollbackTransactionAsync();
-            return ApiResponse<BinResponse>.Failure(
-                "An error occurred while creating the bin.", statusCode: 500);
-        }
+        return ApiResponse<BinResponse>.Success(response, "Bin created successfully.", statusCode: 201);
     }
 
     public async Task<ApiResponse<BinResponse>> GetBinById(int id)
     {
-        var bin = await _binRepository.GetAsync(b => b.Id == id,
-            includes: q => q.Include(b => b.Zone)
-                            .ThenInclude(z => z.Warehouse));
+        if (id <= 0)
+            return ApiResponse<BinResponse>.Failure("Invalid Id", statusCode: 400);
+
+        var bin = await _binRepository.GetAsync(b => b.Id == id, includes: q => q.Include(b => b.Zone).ThenInclude(z => z.Warehouse));
 
         if (bin is null)
             return ApiResponse<BinResponse>.Failure("Bin not found.", statusCode: 404);
@@ -110,8 +95,12 @@ public class BinService : IBinService
         return ApiResponse<BinResponse>.Success(response, statusCode: 200);
     }
 
-    public async Task<ApiResponse<string>> DeleteBin(int id, int deletedBy)
+    public async Task<ApiResponse<string>> DeleteBin(int id)
     {
+        if (id <= 0)
+            return ApiResponse<string>.Failure("Invalid Id", statusCode: 400);
+
+        int deletedBy = _currentUser.GetUserId();
         var bin = await _binRepository.GetAsync(b => b.Id == id, useNoTracking: false);
 
         if (bin is null)
@@ -124,7 +113,7 @@ public class BinService : IBinService
             return ApiResponse<string>.Failure("Cannot delete a Bin that has stock. Please remove stock  first.");
         }
 
-        await _binRepository.SoftDeleteAsync(bin,deletedBy);
+        await _binRepository.SoftDeleteAsync(bin, deletedBy);
         return ApiResponse<string>.Success("Bin Deleted Successfully.");
     }
 
@@ -160,8 +149,13 @@ public class BinService : IBinService
         return ApiResponse<List<BinDropdownResponse>>.Success(response, statusCode: 200);
     }
 
-    public async Task<ApiResponse<BinResponse>> UpdateBin(int id, BinUpdateRequest request, int modifiedByUserId)
+    public async Task<ApiResponse<BinResponse>> UpdateBin(int id, BinUpdateRequest request)
     {
+        if (id <= 0)
+            return ApiResponse<BinResponse>.Failure("Invalid Id", statusCode: 400);
+
+        int modifiedByUserId = _currentUser.GetUserId();
+
         request = _inputNormalizer.NormalizeObject(request);
 
         var bin = await _binRepository.GetAsync(b => b.Id == id, useNoTracking: false,
@@ -177,8 +171,6 @@ public class BinService : IBinService
             return ApiResponse<BinResponse>.Failure("A bin with this name already exists in the zone.", statusCode: 400);
         }
 
-        var previousValue = _mapper.Map<BinResponse>(bin);
-
         bin.Name = !string.IsNullOrWhiteSpace(request.Name) ? request.Name : bin.Name;
 
         if (request.MaxCapacity.HasValue)
@@ -190,19 +182,16 @@ public class BinService : IBinService
         await _binRepository.SaveChangesAsync();
         var response = _mapper.Map<BinResponse>(bin);
 
-        await _auditService.LogAsync(
-            action: AuditActions.Updated,
-            entityName: "Bin",
-            entityId: bin.Id.ToString(),
-            performedBy: modifiedByUserId,
-            previousValue: previousValue,
-            newValue: response);
-
         return ApiResponse<BinResponse>.Success(response, "Bin updated successfully.", statusCode: 200);
     }
 
-    public async Task<ApiResponse<string>> UpdateBinStatus(int id, BinStatusUpdateRequest request, int modifiedByUserId)
+    public async Task<ApiResponse<string>> UpdateBinStatus(int id, BinStatusUpdateRequest request)
     {
+        if (id <= 0)
+            return ApiResponse<string>.Failure("Invalid Id", statusCode: 400);
+
+        int modifiedByUserId = _currentUser.GetUserId();
+
         var bin = await _binRepository.GetAsync(b => b.Id == id, useNoTracking: false);
 
         if (bin is null)
@@ -220,7 +209,6 @@ public class BinService : IBinService
 
         try
         {
-            var previousStatus = bin.Status;
 
             //if last active bin is inactivating then we need to inactive zone.
             if (request.Status == EntityStatus.Inactive && await isLastActiveBinInZone(bin.ZoneId))
@@ -230,14 +218,6 @@ public class BinService : IBinService
                 bin.ModifiedAt = DateTime.UtcNow;
 
                 await _binRepository.SaveChangesAsync();
-
-                await _auditService.LogAsync(
-                        action: AuditActions.Updated,
-                        entityName: "Bin",
-                        entityId: bin.Id.ToString(),
-                        performedBy: modifiedByUserId,
-                        previousValue: previousStatus,
-                        newValue: bin.Status);
 
                 var response = await UpdateZoneStatus(bin.ZoneId, new ZoneStatusUpdateRequest { Status = EntityStatus.Inactive }, modifiedByUserId);
 
@@ -260,14 +240,6 @@ public class BinService : IBinService
 
                 await _binRepository.SaveChangesAsync();
 
-                await _auditService.LogAsync(
-                        action: AuditActions.Updated,
-                        entityName: "Bin",
-                        entityId: bin.Id.ToString(),
-                        performedBy: modifiedByUserId,
-                        previousValue: previousStatus,
-                        newValue: bin.Status);
-
                 var response = await UpdateZoneStatus(bin.ZoneId, new ZoneStatusUpdateRequest { Status = EntityStatus.Active }, modifiedByUserId);
 
                 if (!response.IsSuccess)
@@ -286,21 +258,11 @@ public class BinService : IBinService
 
             await _binRepository.SaveChangesAsync();
 
-            await _auditService.LogAsync(
-                action: AuditActions.Updated,
-                entityName: "Bin",
-                entityId: bin.Id.ToString(),
-                performedBy: modifiedByUserId,
-                previousValue: previousStatus,
-                newValue: bin.Status);
-
             await _binRepository.CommitTransactionAsync();
             return ApiResponse<string>.Success($"Bin {bin.Status} successfully.", statusCode: 200);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            Console.WriteLine("---------------------------------");
-            Console.WriteLine(ex);
             await _binRepository.RollbackTransactionAsync();
             return ApiResponse<string>.Failure("An error occurred while updating the bin status.", statusCode: 500);
         }
@@ -332,14 +294,7 @@ public class BinService : IBinService
         zone.ModifiedAt = DateTime.UtcNow;
 
         await _zoneRepository.SaveChangesAsync();
-
-        await _auditService.LogAsync(
-            action: AuditActions.Updated,
-            entityName: "Zone",
-            entityId: zone.Id.ToString(),
-            performedBy: modifiedByUserId,
-            previousValue: previousStatus,
-            newValue: zone.Status);
+        
         var response = await _zoneService.UpdateWarehouseStatus(zone.WarehouseId, new WarehouseStatusUpdateRequest { Status = request.Status }, modifiedByUserId);
         if (!response.IsSuccess)
         {

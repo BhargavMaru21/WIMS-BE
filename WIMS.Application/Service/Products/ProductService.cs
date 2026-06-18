@@ -22,6 +22,7 @@ public class ProductService : IProductService
     private readonly IInputNormalizer _inputNormalizer;
     private readonly ICodeGeneratorService _codeGeneratorService;
     private readonly IValidator<ProductCreateRequest> _productValidator;
+    private readonly ICurrentUserService _currentUser;
 
     public ProductService(
         IProductRepository productRepository,
@@ -30,7 +31,8 @@ public class ProductService : IProductService
         IMapper mapper,
         IInputNormalizer inputNormalizer,
         ICodeGeneratorService codeGeneratorService,
-        IValidator<ProductCreateRequest> productValidator
+        IValidator<ProductCreateRequest> productValidator,
+        ICurrentUserService currentUser
         )
     {
         _productRepository = productRepository;
@@ -40,11 +42,13 @@ public class ProductService : IProductService
         _inputNormalizer = inputNormalizer;
         _codeGeneratorService = codeGeneratorService;
         _productValidator = productValidator;
+        _currentUser = currentUser;
     }
 
-    public async Task<ApiResponse<ProductResponse>> CreateProduct(ProductCreateRequest request, int createdByUserId)
+    public async Task<ApiResponse<ProductResponse>> CreateProduct(ProductCreateRequest request)
     {
         request = _inputNormalizer.NormalizeObject(request);
+        var createdByUserId = _currentUser.GetUserId();
 
         var category = await _categoryRepository.GetAsync(x => x.Id == request.CategoryId);
 
@@ -62,9 +66,6 @@ public class ProductService : IProductService
         if (await _productRepository.ExistsAsync(x => x.Name.ToLower() == request.Name.ToLower()))
             return ApiResponse<ProductResponse>.Failure("A product with this name already exists.", statusCode: 400);
 
-        await _productRepository.BeginTransactionAsync();
-        try
-        {
             var entity = _mapper.Map<Product>(request);
             entity.CreatedBy = createdByUserId;
 
@@ -77,18 +78,19 @@ public class ProductService : IProductService
 
             var response = _mapper.Map<ProductResponse>(productWithIncludes);
 
-            await _productRepository.CommitTransactionAsync();
             return ApiResponse<ProductResponse>.Success(response, "Product created successfully.", statusCode: 201);
-        }
-        catch (Exception)
-        {
-            await _productRepository.RollbackTransactionAsync();
-            return ApiResponse<ProductResponse>.Failure("error occurred while creating the product.", statusCode: 500);
-        }
     }
 
-    public async Task<ApiResponse<string>> ImportFile(ImportDto request, int createdByUserId)
+    public async Task<ApiResponse<string>> ImportFile(ImportDto request)
     {
+        if (request.File is null || request.File.Length == 0)
+            return ApiResponse<string>.Failure("Please upload a file.", statusCode: 400);
+
+        if (!request.File.FileName.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase))
+            return ApiResponse<string>.Failure("Only .xlsx files are supported. Please upload a valid Excel file.", statusCode: 400);
+
+        var createdByUserId = _currentUser.GetUserId();
+
         var templateFileColumns = new List<string> { "name", "Description", "CategoryId", "UomId", "UnitPrice", "ReorderLevel" };
 
         // Process file in-memory using ClosedXML
@@ -122,9 +124,9 @@ public class ProductService : IProductService
             foreach (var row in worksheet.RangeUsed()!.RowsUsed().Skip(2))
             {
                 //for empty row
-                if(row.Cells().All(c => string.IsNullOrWhiteSpace(c.GetString())))
+                if (row.Cells().All(c => string.IsNullOrWhiteSpace(c.GetString())))
                     continue;
-                
+
                 var name = row.Cell(1).GetValue<string>().Trim();
                 var description = row.Cell(2).GetValue<string>().Trim();
                 var categoryIdExcel = row.Cell(3).GetValue<string>().Trim();
@@ -132,25 +134,25 @@ public class ProductService : IProductService
                 var unitPriceExcel = row.Cell(5).GetValue<string>().Trim();
                 var reorderLevelExcel = row.Cell(6).GetValue<string>().Trim();
 
-                if(!int.TryParse(categoryIdExcel, out int categoryId) || categoryId <= 0)
+                if (!int.TryParse(categoryIdExcel, out int categoryId) || categoryId <= 0)
                 {
                     await _productRepository.RollbackTransactionAsync();
                     return ApiResponse<string>.Failure($"Row {row.RowNumber()} : CategoryId must be valid positive number");
                 }
 
-                if(!int.TryParse(uomIdExcel, out int uomId) || uomId <= 0)
+                if (!int.TryParse(uomIdExcel, out int uomId) || uomId <= 0)
                 {
                     await _productRepository.RollbackTransactionAsync();
                     return ApiResponse<string>.Failure($"Row {row.RowNumber()} : uomId must be valid positive number");
                 }
 
-                if(!decimal.TryParse(unitPriceExcel, out decimal unitPrice) || uomId <= 0)
+                if (!decimal.TryParse(unitPriceExcel, out decimal unitPrice) || unitPrice <= 0)
                 {
                     await _productRepository.RollbackTransactionAsync();
                     return ApiResponse<string>.Failure($"Row {row.RowNumber()} : unitPrice must be valid positive number");
                 }
 
-                if(!decimal.TryParse(reorderLevelExcel, out decimal reorderLevel) || reorderLevel <= 0)
+                if (!decimal.TryParse(reorderLevelExcel, out decimal reorderLevel) || reorderLevel <= 0)
                 {
                     await _productRepository.RollbackTransactionAsync();
                     return ApiResponse<string>.Failure($"Row {row.RowNumber()} : reorderLevel must be valid positive number");
@@ -186,11 +188,11 @@ public class ProductService : IProductService
 
                     var validationResult = await _productValidator.ValidateAsync(productRequestDto);
 
-                    if(!validationResult.IsValid)
+                    if (!validationResult.IsValid)
                     {
                         await _productRepository.RollbackTransactionAsync();
                         var errors = validationResult.Errors.Select(e => e.ErrorMessage);
-                        return ApiResponse<string>.Failure($"Row number : {row.RowNumber()} Is Invalid . {string.Join(" ",errors)}");
+                        return ApiResponse<string>.Failure($"Row number : {row.RowNumber()} Is Invalid . {string.Join(" ", errors)}");
                     }
 
                     var entity = _mapper.Map<Product>(productRequestDto);
@@ -246,18 +248,10 @@ public class ProductService : IProductService
         return ApiResponse<PagedResult<ProductResponse>>.Success(result, statusCode: 200);
     }
 
-    public async Task<ApiResponse<List<ProductResponse>>> GetAllProducts()
-    {
-        var allProducts = await _productRepository.GetAllAsync(orderBy: q => q.OrderBy(x => x.Sku),includes : p => p.Include(x => x.Uom));
-
-        var result = _mapper.Map<List<ProductResponse>>(allProducts);
-
-        return ApiResponse<List<ProductResponse>>.Success(result, statusCode: 200);
-    }
-
-    public async Task<ApiResponse<ProductResponse>> UpdateProduct(int id, ProductUpdateRequest request, int modifiedByUserId)
+    public async Task<ApiResponse<ProductResponse>> UpdateProduct(int id, ProductUpdateRequest request)
     {
         request = _inputNormalizer.NormalizeObject(request);
+        int modifiedByUserId = _currentUser.GetUserId();
 
         var product = await _productRepository.GetAsync(x => x.Id == id, useNoTracking: false);
 
@@ -302,9 +296,10 @@ public class ProductService : IProductService
         return ApiResponse<ProductResponse>.Success(response, "Product updated successfully.", statusCode: 200);
     }
 
-    public async Task<ApiResponse<string>> UpdateProductStatus(int id, ProductStatusUpdateRequest request, int modifiedByUserId)
+    public async Task<ApiResponse<string>> UpdateProductStatus(int id, ProductStatusUpdateRequest request)
     {
         var product = await _productRepository.GetAsync(x => x.Id == id, useNoTracking: false);
+        int modifiedByUserId = _currentUser.GetUserId();
 
         if (product is null)
             return ApiResponse<string>.Failure("Product not found.", statusCode: 404);
@@ -352,8 +347,9 @@ public class ProductService : IProductService
         return ApiResponse<string>.Success($"Product {product.Status} successfully.", statusCode: 200);
     }
 
-    public async Task<ApiResponse<string>> DeleteProduct(int id, int deletedBy)
+    public async Task<ApiResponse<string>> DeleteProduct(int id)
     {
+        int deletedBy = _currentUser.GetUserId();
         var product = await _productRepository.GetAsync(x => x.Id == id, useNoTracking: false);
 
         if (product is null)
@@ -365,5 +361,55 @@ public class ProductService : IProductService
         await _productRepository.SoftDeleteAsync(product, deletedBy);
 
         return ApiResponse<string>.Success("Product deleted successfully.", statusCode: 200);
+    }
+
+    public async Task<byte[]> ExportProductsToExcel()
+    {
+        var products = await _productRepository.GetAllAsync(orderBy: q => q.OrderBy(x => x.Sku),includes: q => q.Include(p => p.Category).Include(p => p.Uom)
+        );
+
+        var data = _mapper.Map<List<ProductResponse>>(products);
+
+        using var workbook = new XLWorkbook();
+        var worksheet = workbook.Worksheets.Add("Products Report");
+
+        worksheet.Cell(1, 1).Value = "SKU";
+        worksheet.Cell(1, 2).Value = "Name";
+        worksheet.Cell(1, 3).Value = "Description";
+        worksheet.Cell(1, 4).Value = "CategoryId";
+        worksheet.Cell(1, 5).Value = "CategoryName";
+        worksheet.Cell(1, 6).Value = "UomId";
+        worksheet.Cell(1, 7).Value = "UomName";
+        worksheet.Cell(1, 8).Value = "UomAbbreviation";
+        worksheet.Cell(1, 9).Value = "UnitPrice";
+        worksheet.Cell(1, 10).Value = "ReorderLevel";
+        worksheet.Cell(1, 11).Value = "Status";
+
+        var headerRange = worksheet.Range("A1:K1");
+        headerRange.Style.Font.Bold = true;
+        headerRange.Style.Fill.BackgroundColor = XLColor.LightSteelBlue;
+
+        int currentRow = 2;
+        foreach (var product in data)
+        {
+            worksheet.Cell(currentRow, 1).Value = product.Sku;
+            worksheet.Cell(currentRow, 2).Value = product.Name;
+            worksheet.Cell(currentRow, 3).Value = product.Description;
+            worksheet.Cell(currentRow, 4).Value = product.CategoryId;
+            worksheet.Cell(currentRow, 5).Value = product.CategoryName;
+            worksheet.Cell(currentRow, 6).Value = product.UomId;
+            worksheet.Cell(currentRow, 7).Value = product.UomName;
+            worksheet.Cell(currentRow, 8).Value = product.UomAbbreviation;
+            worksheet.Cell(currentRow, 9).Value = product.UnitPrice;
+            worksheet.Cell(currentRow, 10).Value = product.ReorderLevel;
+            worksheet.Cell(currentRow, 11).Value = product.Status;
+            currentRow++;
+        }
+
+        worksheet.Columns().AdjustToContents();
+
+        using var stream = new MemoryStream();
+        workbook.SaveAs(stream);
+        return stream.ToArray();
     }
 }

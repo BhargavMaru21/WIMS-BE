@@ -15,16 +15,19 @@ public class ProductCategoryService : IProductCategoryService
     private readonly IProductCategoryRepository _categoryRepository;
     private readonly IMapper _mapper;
     private readonly IInputNormalizer _inputNormalizer;
+    private readonly ICurrentUserService _currentUser;
 
-    public ProductCategoryService(IProductCategoryRepository categoryRepository, IMapper mapper, IInputNormalizer inputNormalizer)
+    public ProductCategoryService(IProductCategoryRepository categoryRepository, IMapper mapper, IInputNormalizer inputNormalizer, ICurrentUserService currentUser)
     {
         _categoryRepository = categoryRepository;
         _mapper = mapper;
         _inputNormalizer = inputNormalizer;
+        _currentUser = currentUser;
     }
 
-    public async Task<ApiResponse<ProductCategoryResponse>> CreateCategory(ProductCategoryCreateRequest request, int createdByUserId)
+    public async Task<ApiResponse<ProductCategoryResponse>> CreateCategory(ProductCategoryCreateRequest request)
     {
+        int createdByUserId = _currentUser.GetUserId();
         request = _inputNormalizer.NormalizeObject(request);
 
         if (await _categoryRepository.ExistsAsync(x => x.Name.ToLower() == request.Name.ToLower()))
@@ -41,6 +44,9 @@ public class ProductCategoryService : IProductCategoryService
 
     public async Task<ApiResponse<ProductCategoryResponse>> GetCategoryById(int id)
     {
+        if (id <= 0)
+            return ApiResponse<ProductCategoryResponse>.Failure("Invalid ID.", statusCode: 400);
+
         var category = await _categoryRepository.GetAsync(x => x.Id == id);
 
         if (category is null)
@@ -81,8 +87,12 @@ public class ProductCategoryService : IProductCategoryService
         return ApiResponse<List<ProductCategoryDropdownResponse>>.Success(response, statusCode: 200);
     }
 
-    public async Task<ApiResponse<ProductCategoryResponse>> UpdateCategory(int id, ProductCategoryUpdateRequest request, int modifiedByUserId)
+    public async Task<ApiResponse<ProductCategoryResponse>> UpdateCategory(int id, ProductCategoryUpdateRequest request)
     {
+        if (id <= 0)
+            return ApiResponse<ProductCategoryResponse>.Failure("Invalid ID.", statusCode: 400);
+
+        int modifiedByUserId = _currentUser.GetUserId();
         request = _inputNormalizer.NormalizeObject(request);
 
         var category = await _categoryRepository.GetAsync(x => x.Id == id, useNoTracking: false);
@@ -104,8 +114,12 @@ public class ProductCategoryService : IProductCategoryService
         return ApiResponse<ProductCategoryResponse>.Success(response, "Product category updated successfully.", statusCode: 200);
     }
 
-    public async Task<ApiResponse<string>> UpdateCategoryStatus(int id, ProductCategoryStatusUpdateRequest request, int modifiedByUserId)
+    public async Task<ApiResponse<string>> UpdateCategoryStatus(int id, ProductCategoryStatusUpdateRequest request)
     {
+        if (id <= 0)
+            return ApiResponse<string>.Failure("Invalid ID.", statusCode: 400);
+
+        int modifiedByUserId = _currentUser.GetUserId();
         var category = await _categoryRepository.GetAsync(x => x.Id == id, useNoTracking: false);
 
         if (category is null)
@@ -126,8 +140,12 @@ public class ProductCategoryService : IProductCategoryService
         return ApiResponse<string>.Success($"Product category {category.Status} successfully.", statusCode: 200);
     }
 
-    public async Task<ApiResponse<string>> DeleteCategory(int id, int deletedBy)
+    public async Task<ApiResponse<string>> DeleteCategory(int id)
     {
+        if (id <= 0)
+            return ApiResponse<string>.Failure("Invalid ID.", statusCode: 400);
+            
+        int deletedBy = _currentUser.GetUserId();
         var category = await _categoryRepository.GetAsync(x => x.Id == id, useNoTracking: false);
 
         if (category is null)

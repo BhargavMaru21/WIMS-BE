@@ -20,16 +20,15 @@ public class ZoneService : IZoneService
     private readonly IMapper _mapper;
     private readonly IInputNormalizer _inputNormalizer;
     private readonly ICodeGeneratorService _codeGeneratorService;
-    private readonly IAuditService _auditService;
-
+    private readonly ICurrentUserService _currentUser;
     public ZoneService(
         IZoneRepository zoneRepository,
         IWarehouseRepository warehouseRepository,
         IMapper mapper,
         IInputNormalizer inputNormalizer,
         ICodeGeneratorService codeGeneratorService,
-        IAuditService auditService,
-        IBinRepository binRepository
+        IBinRepository binRepository,
+        ICurrentUserService currentUser
         )
     {
         _zoneRepository = zoneRepository;
@@ -37,12 +36,13 @@ public class ZoneService : IZoneService
         _mapper = mapper;
         _inputNormalizer = inputNormalizer;
         _codeGeneratorService = codeGeneratorService;
-        _auditService = auditService;
         _binRepository = binRepository;
+        _currentUser = currentUser;
     }
 
-    public async Task<ApiResponse<ZoneResponse>> CreateZone(ZoneCreateRequest request, int createdByUserId)
+    public async Task<ApiResponse<ZoneResponse>> CreateZone(ZoneCreateRequest request)
     {
+        int createdByUserId = _currentUser.GetUserId();
         request = _inputNormalizer.NormalizeObject(request);
 
         var warehouse = await _warehouseRepository.GetAsync(w => w.Id == request.WarehouseId);
@@ -60,43 +60,28 @@ public class ZoneService : IZoneService
             return ApiResponse<ZoneResponse>.Failure(
                 "A zone with this name already exists in the selected warehouse.", statusCode: 400);
 
-        await _zoneRepository.BeginTransactionAsync();
-        try
-        {
-            var zoneEntity = _mapper.Map<Zone>(request);
-            zoneEntity.CreatedBy = createdByUserId;
+        var zoneEntity = _mapper.Map<Zone>(request);
+        zoneEntity.CreatedBy = createdByUserId;
 
-            var createdZone = await _zoneRepository.CreateAsync(zoneEntity);
+        var createdZone = await _zoneRepository.CreateAsync(zoneEntity);
 
-            createdZone.Code = _codeGeneratorService.GenerateCode("zone", createdZone.Id);
-            await _zoneRepository.SaveChangesAsync();
+        createdZone.Code = _codeGeneratorService.GenerateCode("zone", createdZone.Id);
+        await _zoneRepository.SaveChangesAsync();
 
-            var zoneWitWarehouse = await _zoneRepository.GetAsync(
-                z => z.Id == createdZone.Id,
-                includes: q => q.Include(z => z.Warehouse));
+        var zoneWitWarehouse = await _zoneRepository.GetAsync(
+            z => z.Id == createdZone.Id,
+            includes: q => q.Include(z => z.Warehouse));
 
-            var response = _mapper.Map<ZoneResponse>(zoneWitWarehouse);
+        var response = _mapper.Map<ZoneResponse>(zoneWitWarehouse);
 
-            await _auditService.LogAsync(
-                action: AuditActions.Created,
-                entityName: "Zone",
-                entityId: createdZone.Id.ToString(),
-                performedBy: createdByUserId,
-                newValue: response);
-
-            await _zoneRepository.CommitTransactionAsync();
-            return ApiResponse<ZoneResponse>.Success(response, "Zone created successfully.", statusCode: 201);
-        }
-        catch (Exception)
-        {
-            await _zoneRepository.RollbackTransactionAsync();
-            return ApiResponse<ZoneResponse>.Failure(
-                "An error occurred while creating the zone.", statusCode: 500);
-        }
+        return ApiResponse<ZoneResponse>.Success(response, "Zone created successfully.", statusCode: 201);
     }
 
     public async Task<ApiResponse<ZoneResponse>> GetZoneById(int id)
     {
+        if (id <= 0)
+            return ApiResponse<ZoneResponse>.Failure("Invalid Id", statusCode: 400);
+
         var zone = await _zoneRepository.GetAsync(
             z => z.Id == id,
             includes: q => q.Include(z => z.Warehouse));
@@ -142,8 +127,13 @@ public class ZoneService : IZoneService
         return ApiResponse<List<ZoneDropdownResponse>>.Success(response, statusCode: 200);
     }
 
-    public async Task<ApiResponse<ZoneResponse>> UpdateZone(int id, ZoneUpdateRequest request, int modifiedByUserId)
+    public async Task<ApiResponse<ZoneResponse>> UpdateZone(int id, ZoneUpdateRequest request)
     {
+        if (id <= 0)
+            return ApiResponse<ZoneResponse>.Failure("Invalid Id", statusCode: 400);
+
+        int modifiedByUserId = _currentUser.GetUserId();
+
         request = _inputNormalizer.NormalizeObject(request);
 
         var zone = await _zoneRepository.GetAsync(
@@ -164,8 +154,6 @@ public class ZoneService : IZoneService
                 "A zone with this name already exists in the warehouse.", statusCode: 400);
         }
 
-        var previousValue = _mapper.Map<ZoneResponse>(zone);
-
         zone.Name = !string.IsNullOrWhiteSpace(request.Name) ? request.Name : zone.Name;
         zone.ModifiedBy = modifiedByUserId;
         zone.ModifiedAt = DateTime.UtcNow;
@@ -173,19 +161,16 @@ public class ZoneService : IZoneService
         await _zoneRepository.SaveChangesAsync();
         var response = _mapper.Map<ZoneResponse>(zone);
 
-        await _auditService.LogAsync(
-            action: AuditActions.Updated,
-            entityName: "Zone",
-            entityId: zone.Id.ToString(),
-            performedBy: modifiedByUserId,
-            previousValue: previousValue,
-            newValue: response);
-
         return ApiResponse<ZoneResponse>.Success(response, "Zone updated successfully.", statusCode: 200);
     }
 
-    public async Task<ApiResponse<string>> UpdateZoneStatus(int id, ZoneStatusUpdateRequest request, int modifiedByUserId)
+    public async Task<ApiResponse<string>> UpdateZoneStatus(int id, ZoneStatusUpdateRequest request)
     {
+        if (id <= 0)
+            return ApiResponse<string>.Failure("Invalid Id", statusCode: 400);
+
+        int modifiedByUserId = _currentUser.GetUserId();
+
         var zone = await _zoneRepository.GetAsync(
             z => z.Id == id,
             useNoTracking: false,
@@ -212,8 +197,6 @@ public class ZoneService : IZoneService
         await _zoneRepository.BeginTransactionAsync();
         try
         {
-            var previousStatus = zone.Status;
-
             // if inactivating the last active zone in the warehouse, then inactivate the warehouse as well
             if (request.Status == EntityStatus.Inactive && await isLastActiveZoneInWarehouse(zone.WarehouseId))
             {
@@ -222,15 +205,6 @@ public class ZoneService : IZoneService
                 zone.ModifiedAt = DateTime.UtcNow;
 
                 await _zoneRepository.SaveChangesAsync();
-
-                await _auditService.LogAsync(
-                    action: AuditActions.Updated,
-                    entityName: "Zone",
-                    entityId: zone.Id.ToString(),
-                    performedBy: modifiedByUserId,
-                    previousValue: previousStatus,
-                    newValue: zone.Status);
-
                 var warehouseResponse = await UpdateWarehouseStatus(zone.WarehouseId, new WarehouseStatusUpdateRequest { Status = EntityStatus.Inactive }, modifiedByUserId);
 
                 if (!warehouseResponse.IsSuccess)
@@ -253,14 +227,6 @@ public class ZoneService : IZoneService
 
                 await _zoneRepository.SaveChangesAsync();
 
-                await _auditService.LogAsync(
-                    action: AuditActions.Updated,
-                    entityName: "Zone",
-                    entityId: zone.Id.ToString(),
-                    performedBy: modifiedByUserId,
-                    previousValue: previousStatus,
-                    newValue: zone.Status);
-
                 var warehouseResponse = await UpdateWarehouseStatus(zone.WarehouseId, new WarehouseStatusUpdateRequest { Status = EntityStatus.Active }, modifiedByUserId);
 
                 if (!warehouseResponse.IsSuccess)
@@ -278,14 +244,6 @@ public class ZoneService : IZoneService
             zone.ModifiedAt = DateTime.UtcNow;
 
             await _zoneRepository.SaveChangesAsync();
-
-            await _auditService.LogAsync(
-                action: AuditActions.Updated,
-                entityName: "Zone",
-                entityId: zone.Id.ToString(),
-                performedBy: modifiedByUserId,
-                previousValue: previousStatus,
-                newValue: zone.Status);
 
             await _zoneRepository.CommitTransactionAsync();
             return ApiResponse<string>.Success($"Zone {zone.Status} successfully.", statusCode: 200);
@@ -317,27 +275,21 @@ public class ZoneService : IZoneService
         if (warehouse is null)
             return ApiResponse<string>.Failure("Warehouse not found.", statusCode: 404);
 
-        var previousValue = warehouse.Status;
-
         warehouse.Status = request.Status;
         warehouse.ModifiedBy = modifiedByUserId;
         warehouse.ModifiedAt = DateTime.UtcNow;
 
         await _warehouseRepository.SaveChangesAsync();
-
-        await _auditService.LogAsync(
-          action: AuditActions.Updated,
-          entityName: "Warehouse",
-          entityId: warehouse.Id.ToString(),
-          performedBy: modifiedByUserId,
-          previousValue: previousValue,
-          newValue: warehouse.Status
-      );
         return ApiResponse<string>.Success($"Warehouse {warehouse.Status} successfully.", statusCode: 200);
     }
 
-    public async Task<ApiResponse<string>> DeleteZone(int id, int deletedBy)
+    public async Task<ApiResponse<string>> DeleteZone(int id)
     {
+        if (id <= 0)
+            return ApiResponse<string>.Failure("Invalid Id", statusCode: 400);
+
+        int deletedBy = _currentUser.GetUserId();
+
         var zone = await _zoneRepository.GetAsync(z => z.Id == id, useNoTracking: false, includes: q => q.Include(b => b.Bins));
 
         if (zone is null)
@@ -355,11 +307,12 @@ public class ZoneService : IZoneService
 
         try
         {
-            foreach(var bin in allBins){
-                await _binRepository.SoftDeleteAsync(bin,deletedBy);
+            foreach (var bin in allBins)
+            {
+                await _binRepository.SoftDeleteAsync(bin, deletedBy);
             }
 
-            await _zoneRepository.SoftDeleteAsync(zone,deletedBy);
+            await _zoneRepository.SoftDeleteAsync(zone, deletedBy);
             await _zoneRepository.CommitTransactionAsync();
             return ApiResponse<string>.Success("Zone and it's related Bins are deleted ");
 

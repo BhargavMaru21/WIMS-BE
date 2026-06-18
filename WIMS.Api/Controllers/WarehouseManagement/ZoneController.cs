@@ -20,88 +20,52 @@ public class ZoneController : ControllerBase
         _zoneService = zoneService;
     }
 
-    private int GetCurrentUserId()
-        => int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-
     [HttpPost]
-    public async Task<IActionResult> CreateZone(ZoneCreateRequest request)
+    public async Task<ApiResponse<ZoneResponse>> CreateZone(ZoneCreateRequest request)
     {
-        var response = await _zoneService.CreateZone(request, GetCurrentUserId());
-
-        if (!response.IsSuccess)
-        {
-            if (response.StatusCode == 404)
-                return NotFound(response);
-
-            return BadRequest(response);
-        }
-           
-        return StatusCode(201, response);
+        var response = await _zoneService.CreateZone(request);
+        return response ;
     }
 
     [HttpGet("{id:int}")]
-    public async Task<IActionResult> GetZoneById(int id)
+    public async Task<ApiResponse<ZoneResponse>> GetZoneById(int id)
     {
         var response = await _zoneService.GetZoneById(id);
-
-        if (!response.IsSuccess)
-            return NotFound(response);
-
-        return Ok(response);
+        return response;
     }
 
     [HttpDelete("{id:int}")]
-    public async Task<IActionResult> DeleteZone(int id)
+    public async Task<ApiResponse<string>> DeleteZone(int id)
     {
-        var response = await _zoneService.DeleteZone(id,GetCurrentUserId());
-
-        if (!response.IsSuccess)
-            return NotFound(response);
-
-        return Ok(response);
+        var response = await _zoneService.DeleteZone(id);
+        return response;
     }
 
     [HttpGet]
-    public async Task<IActionResult> GetZones([FromQuery] QueryParameters qp)
+    public async Task<ApiResponse<PagedResult<ZoneResponse>>> GetZones([FromQuery] QueryParameters qp)
     {
         var response = await _zoneService.GetZones(qp);
-        return Ok(response);
+        return response;
     }
 
     [HttpGet("all")]
-    public async Task<IActionResult> GetZonesDropdown([FromQuery] int? warehouseId = null)
+    public async Task<ApiResponse<List<ZoneDropdownResponse>>> GetZonesDropdown([FromQuery] int? warehouseId = null)
     {
         var response = await _zoneService.GetZonesDropdown(warehouseId);
-        return Ok(response);
+        return response;
     }
 
     [HttpPatch("{id:int}")]
-    public async Task<IActionResult> UpdateZone(int id, ZoneUpdateRequest request)
+    public async Task<ApiResponse<ZoneResponse>> UpdateZone(int id, ZoneUpdateRequest request)
     {
-        var response = await _zoneService.UpdateZone(id, request, GetCurrentUserId());
-
-        if (!response.IsSuccess)
-        {
-            if (response.StatusCode == 404)
-                return NotFound(response);
-
-            return BadRequest(response);
-        }
-
-        return Ok(response);
+        var response = await _zoneService.UpdateZone(id, request);
+        return response;
     }
 
     [HttpPatch("{id:int}/status")]
-    public async Task<IActionResult> UpdateZoneStatus(int id, ZoneStatusUpdateRequest request)
+    public async Task<ApiResponse<string>> UpdateZoneStatus(int id, ZoneStatusUpdateRequest request)
     {
-        var response = await _zoneService.UpdateZoneStatus(id, request, GetCurrentUserId());
-
-        if (!response.IsSuccess){
-            if(response.StatusCode == 404)
-                return NotFound(response);
-            return BadRequest(response);
-        }
-
-        return Ok(response);
+        var response = await _zoneService.UpdateZoneStatus(id, request);
+        return response;
     }
 }

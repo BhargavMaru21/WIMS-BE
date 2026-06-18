@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using WIMS.Application.DTOs;
 using WIMS.Application.DTOs.Profile;
 using WIMS.Application.Interfaces.Services.Profile;
 
@@ -18,22 +19,17 @@ public class ProfileController : ControllerBase
         _userProfileService = userProfileService;
     }
 
-    private int GetCurrentUserId()
-        => int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-
     [HttpGet]
-    public async Task<IActionResult> GetProfile()
+    public async Task<ApiResponse<UserProfileResponse>> GetProfile()
     {
-        var result = await _userProfileService.GetProfile(GetCurrentUserId());
-
-        return result.IsSuccess ? Ok(result) : NotFound(result);
+        var result = await _userProfileService.GetProfile();
+        return result;
     }
 
     [HttpPatch]
-    public async Task<IActionResult> UpdateProfile(UpdateProfileRequest request)
+    public async Task<ApiResponse<UserProfileResponse>> UpdateProfile(UpdateProfileRequest request)
     {
-        var result = await _userProfileService.UpdateProfile(GetCurrentUserId(), request);
-
-        return result.IsSuccess ? Ok(result) : NotFound(result);
+        var result = await _userProfileService.UpdateProfile(request);
+        return result;
     }
 }

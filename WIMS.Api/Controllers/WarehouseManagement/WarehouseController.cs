@@ -20,84 +20,47 @@ public class WarehouseController : ControllerBase
         _warehouseService = warehouseService;
     }
 
-    private int GetCurrentUserId()
-    => int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-
     [HttpPost]
-    public async Task<IActionResult> CreateWarehouse(WarehouseCreateRequest request)
+    public async Task<ApiResponse<WarehouseResponse>> CreateWarehouse(WarehouseCreateRequest request)
     {
-        var response = await _warehouseService.CreateWarehouse(request, GetCurrentUserId());
-
-        if (!response.IsSuccess)
-        {
-            return BadRequest(response);
-        }
-
-        return StatusCode(201, response);
+        var response = await _warehouseService.CreateWarehouse(request);
+        return response;
     }
 
 
     [HttpGet("{id:int}")]
-    public async Task<IActionResult> GetWarehouseById(int id)
+    public async Task<ApiResponse<WarehouseResponse>> GetWarehouseById(int id)
     {
         var response = await _warehouseService.GetWarehouseById(id);
-
-        if (!response.IsSuccess)
-        {
-            return NotFound(response);
-        }
-
-        return Ok(response);
+        return response;
     }
 
     [HttpDelete("{id:int}")]
-    public async Task<IActionResult> DeleteWarehouse(int id)
+    public async Task<ApiResponse<string>> DeleteWarehouse(int id)
     {
-        var response = await _warehouseService.DeleteWarehouse(id,GetCurrentUserId());
-
-        if (!response.IsSuccess)
-        {
-            return NotFound(response);
-        }
-
-        return Ok(response);
+        var response = await _warehouseService.DeleteWarehouse(id);
+        return response;
     }
 
     [HttpGet]
-    public async Task<IActionResult> GetWarehouses([FromQuery] QueryParameters qp)
+    public async Task<ApiResponse<PagedResult<WarehouseResponse>>> GetWarehouses([FromQuery] QueryParameters qp)
     {
         var response = await _warehouseService.GetWarehouses(qp);
-        return Ok(response);
+        return response;
     }
 
     [HttpPatch("{id:int}")]
-    public async Task<IActionResult> UpdateWarehouse(int id, WarehouseUpdateRequest request)
+    public async Task<ApiResponse<WarehouseResponse>> UpdateWarehouse(int id, WarehouseUpdateRequest request)
     {
-        var response = await _warehouseService.UpdateWarehouse(id, request, GetCurrentUserId());
-
-        if (!response.IsSuccess)
-        {
-            if (response.StatusCode == 404)
-                return NotFound(response);
-            return BadRequest(response);
-        }
-
-        return Ok(response);
+        var response = await _warehouseService.UpdateWarehouse(id, request);
+        return response;
     }
 
     [HttpPatch("{id:int}/status")]
-    public async Task<IActionResult> UpdateWarehouseStatus(int id, WarehouseStatusUpdateRequest request)
+    public async Task<ApiResponse<string>> UpdateWarehouseStatus(int id, WarehouseStatusUpdateRequest request)
     {
-        var response = await _warehouseService.UpdateWarehouseStatus(id, request, GetCurrentUserId());
-
-        if (!response.IsSuccess)
-        {
-            if (response.StatusCode == 404)
-                return NotFound(response);
-            return BadRequest(response);
-        }
-
-        return Ok(response);
+        var response = await _warehouseService.UpdateWarehouseStatus(id, request);
+        return response;
     }
 
 }

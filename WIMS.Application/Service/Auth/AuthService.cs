@@ -1,14 +1,12 @@
-using System.ComponentModel.Design;
 using System.Security.Cryptography;
 using MailKit.Net.Smtp;
+using Microsoft.AspNetCore.Http;
 using WIMS.Application.CommonServices;
 using WIMS.Application.DTOs;
 using WIMS.Application.DTOs.Auth;
 using WIMS.Application.Interfaces.Common;
 using WIMS.Application.Interfaces.Repositories;
-using WIMS.Application.Interfaces.Services.Audit;
 using WIMS.Application.Interfaces.Services.Auth;
-using WIMS.Domain.Constant;
 using WIMS.Domain.Entity;
 using WIMS.Domain.Enums;
 
@@ -22,10 +20,19 @@ public class AuthService : IAuthService
     private readonly IInputNormalizer _inputNormalizer;
     private readonly ICodeGeneratorService _code;
     private readonly IEmailService _emailService;
+    private readonly IHttpContextAccessor _httpContextAccessor;
+    private readonly ICurrentUserService _currentUser;
 
-    private readonly IAuditService _auditService;
-
-    public AuthService(IJwtService jwtService, IUserRepository userRepository, IPasswordHasher passwordHasher, IInputNormalizer inputNormalizer, ICodeGeneratorService code, IEmailService emailService, IAuditService auditService)
+    public AuthService(
+        IJwtService jwtService,
+        IUserRepository userRepository,
+        IPasswordHasher passwordHasher,
+        IInputNormalizer inputNormalizer,
+        ICodeGeneratorService code,
+        IEmailService emailService,
+        IHttpContextAccessor httpContextAccessor,
+        ICurrentUserService currentUser
+        )
     {
         _jwtService = jwtService;
         _userRepository = userRepository;
@@ -33,10 +40,11 @@ public class AuthService : IAuthService
         _inputNormalizer = inputNormalizer;
         _code = code;
         _emailService = emailService;
-        _auditService = auditService;
+        _httpContextAccessor = httpContextAccessor;
+        _currentUser = currentUser;
     }
 
-    public async Task<ApiResponse<GenerateTokenResponse>> Login(LoginRequest request)
+    public async Task<ApiResponse<LoginResponse>> Login(LoginRequest request)
     {
 
         request = _inputNormalizer.NormalizeObject(request);
@@ -45,18 +53,18 @@ public class AuthService : IAuthService
 
         if (user == null)
         {
-            return ApiResponse<GenerateTokenResponse>.Failure("Given Email is not exist.You need to Register First", null, 404);
+            return ApiResponse<LoginResponse>.Failure("Given Email is not exist.You need to Register First", null, 404);
         }
 
         if (IsUserInActive(user))
         {
-            return ApiResponse<GenerateTokenResponse>.Failure("Your account is inactive. Please contact Admin.", null, 403);
+            return ApiResponse<LoginResponse>.Failure("Your account is inactive. Please contact Admin.", null, 403);
         }
 
         if (await IsUserLocked(user))
         {
             var istTime = HelperService.ToIST(user.LockedUntil!.Value);
-            return ApiResponse<GenerateTokenResponse>.Failure($"Your account is locked due to multiple failed login attempts. Please try again after {istTime:dd MMM yyyy, hh:mm tt} IST.", null, 403);
+            return ApiResponse<LoginResponse>.Failure($"Your account is locked due to multiple failed login attempts. Please try again after {istTime:dd MMM yyyy, hh:mm tt} IST.", null, 403);
         }
 
 
@@ -66,30 +74,13 @@ public class AuthService : IAuthService
         {
             await IncreaseFailedLoginAttempts(user);
 
-
             if (user.Status == UserStatus.Locked)
             {
                 var istTime = HelperService.ToIST(user.LockedUntil!.Value);
-
-                await _auditService.LogAsync(
-                    action: AuditActions.AccountLocked,
-                    entityName: "User",
-                    entityId: user.Id.ToString(),
-                    performedBy: user.Id,
-                    newValue: new { user.FailedLoginAttempts, LockedUntil = istTime }
-                );
-                return ApiResponse<GenerateTokenResponse>.Failure($"Your account is locked due to multiple failed login attempts. Please try again after {istTime:dd MMM yyyy, hh:mm tt} IST.", null, 403);
+                return ApiResponse<LoginResponse>.Failure($"Your account is locked due to multiple failed login attempts. Please try again after {istTime:dd MMM yyyy, hh:mm tt} IST.", null, 403);
             }
 
-            await _auditService.LogAsync(
-                action: AuditActions.LoginFailed,
-                entityName: "User",
-                entityId: user.Id.ToString(),
-                performedBy: user.Id,
-                newValue: new { user.FailedLoginAttempts }
-            );
-
-            return ApiResponse<GenerateTokenResponse>.Failure("Invalid Credentials", null, 400);
+            return ApiResponse<LoginResponse>.Failure("Invalid Credentials", null, 400);
         }
 
         GenerateTokenResponse tokenResponse = _jwtService.generateToken(user);
@@ -100,14 +91,20 @@ public class AuthService : IAuthService
 
         await _userRepository.SaveChangesAsync();
 
-        await _auditService.LogAsync(
-            action: AuditActions.Login,
-            entityName: "User",
-            entityId: user.Id.ToString(),
-            performedBy: user.Id
-        );
+        _httpContextAccessor.HttpContext!.Response.Cookies.Append("RefreshToken", tokenResponse.RefreshToken, new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = true,
+            SameSite = SameSiteMode.None,
+            Expires = DateTime.UtcNow.AddDays(10)
+        });
 
-        return ApiResponse<GenerateTokenResponse>.Success(tokenResponse, "Login Successfully", 200);
+        var response = new LoginResponse
+        {
+            AccessToken = tokenResponse.AccessToken
+        };
+
+        return ApiResponse<LoginResponse>.Success(response, "Login Successfully", 200);
     }
 
     private async Task<bool> IsUserLocked(User user)
@@ -148,15 +145,22 @@ public class AuthService : IAuthService
         await _userRepository.SaveChangesAsync();
     }
 
-    public async Task<ApiResponse<GenerateTokenResponse>> RefreshToken(RefreshTokenRequest request)
+    public async Task<ApiResponse<LoginResponse>> RefreshToken()
     {
-        var refreshToken = _inputNormalizer.Normalize(request.RefreshToken);
+        var refreshToken = _httpContextAccessor.HttpContext!.Request.Cookies["RefreshToken"];
+
+        if (string.IsNullOrWhiteSpace(refreshToken))
+        {
+            return ApiResponse<LoginResponse>.Failure("Refresh token not found", null, 401);
+        }
+
+        refreshToken = _inputNormalizer.Normalize(refreshToken);
 
         var user = await _userRepository.GetUserByRefreshTokenAsync(_passwordHasher.NormalHash(refreshToken));
 
         if (user == null || user.RefreshTokenExpiryTime == null || user.RefreshTokenExpiryTime <= DateTime.UtcNow)
         {
-            return ApiResponse<GenerateTokenResponse>.Failure("Invalid refresh token", statusCode: 400);
+            return ApiResponse<LoginResponse>.Failure("Invalid refresh token", statusCode: 400);
         }
 
         GenerateTokenResponse tokenResponse = _jwtService.generateToken(user);
@@ -166,12 +170,27 @@ public class AuthService : IAuthService
 
         await _userRepository.SaveChangesAsync();
 
-        return ApiResponse<GenerateTokenResponse>.Success(tokenResponse, "Request successful.", 200);
+        _httpContextAccessor.HttpContext.Response.Cookies.Append("RefreshToken", tokenResponse.RefreshToken, new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = true,
+            SameSite = SameSiteMode.None,
+            Expires = DateTime.UtcNow.AddDays(10)
+        });
+
+        var response = new LoginResponse
+        {
+            AccessToken = tokenResponse.AccessToken
+        };
+
+        return ApiResponse<LoginResponse>.Success(response, "Request successful.", 200);
     }
 
 
     public async Task<ApiResponse<string>> ChangePassword(ChangePasswordRequest request)
     {
+        request.UserId = _currentUser.GetUserId();
+
         request = _inputNormalizer.NormalizeObject(request);
 
         var user = await _userRepository.GetAsync(x => x.Id == request.UserId, useNoTracking: false);
@@ -195,20 +214,20 @@ public class AuthService : IAuthService
 
         await _userRepository.SaveChangesAsync();
 
-        await _auditService.LogAsync(
-            action: AuditActions.PasswordChanged,
-            entityName: "User",
-            entityId: user.Id.ToString(),
-            performedBy: user.Id
-        );
-
         return ApiResponse<string>.Success("Password changed successfully", "Password changed successfully", 200);
     }
 
 
-    public async Task<ApiResponse<string>> Logout(LogoutRequest request)
+    public async Task<ApiResponse<string>> Logout()
     {
-        var refreshToken = _inputNormalizer.Normalize(request.RefreshToken);
+        var refreshToken = _httpContextAccessor.HttpContext!.Request.Cookies["RefreshToken"];
+
+        if (string.IsNullOrWhiteSpace(refreshToken))
+        {
+            return ApiResponse<string>.Failure("Refresh token not found", null, 401);
+        }
+
+        refreshToken = _inputNormalizer.Normalize(refreshToken);
 
         var user = await _userRepository.GetUserByRefreshTokenAsync(_passwordHasher.NormalHash(refreshToken));
 
@@ -222,12 +241,13 @@ public class AuthService : IAuthService
 
         await _userRepository.SaveChangesAsync();
 
-        await _auditService.LogAsync(
-            action: AuditActions.Logout,
-            entityName: "User",
-            entityId: user.Id.ToString(),
-            performedBy: user.Id
-        );
+        _httpContextAccessor.HttpContext.Response.Cookies.Delete("RefreshToken", new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = true,
+            SameSite = SameSiteMode.None
+        });
+
         return ApiResponse<string>.Success("Logout Successfully", "Logout Successfully", 200);
     }
 
@@ -281,12 +301,6 @@ public class AuthService : IAuthService
 
 
             await _emailService.SendEmailAsync(user.Email, "Reset your password", body);
-            await _auditService.LogAsync(
-                action: AuditActions.ForgotPasswordRequested,
-                entityName: "User",
-                entityId: user.Id.ToString(),
-                performedBy: user.Id
-            );
             await _userRepository.CommitTransactionAsync();
             return ApiResponse<string>.Success($"Resent link has been sent to {user.Email}.", statusCode: 200);
         }
@@ -324,12 +338,14 @@ public class AuthService : IAuthService
         user.RefreshTokenExpiryTime = null;
 
         await _userRepository.SaveChangesAsync();
-        await _auditService.LogAsync(
-            action : AuditActions.PasswordReset,
-            entityName : "User",
-            entityId : user.Id.ToString(),
-            performedBy : user.Id
-        );
+
+        _httpContextAccessor.HttpContext!.Response.Cookies.Delete("RefreshToken", new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = true,
+            SameSite = SameSiteMode.None
+        });
+
         return ApiResponse<string>.Success("Password reset successfully. You can now log in.", statusCode: 200);
     }
 

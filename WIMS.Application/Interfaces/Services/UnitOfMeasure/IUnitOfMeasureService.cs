@@ -6,7 +6,7 @@ namespace WIMS.Application.Interfaces.Services.UnitOfMeasure;
 
 public interface IUnitOfMeasureService
 {
-    Task<ApiResponse<UnitResponse>> CreateUnit (CreateUnitRequest request , int createdByUserId);
+    Task<ApiResponse<UnitResponse>> CreateUnit (CreateUnitRequest request);
     Task<ApiResponse<List<UnitResponse>>> GetUnitsDropdown ();
     Task<ApiResponse<UnitResponse>> UpdateUnit(int id, UpdateUnitRequest request);
     Task<ApiResponse<string>> DeleteUnit(int id);

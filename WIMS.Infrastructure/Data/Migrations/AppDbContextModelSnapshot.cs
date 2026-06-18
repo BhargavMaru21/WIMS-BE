@@ -469,10 +469,6 @@ namespace WIMS.Infrastructure.Data.Migrations
                     b.Property<int?>("ApprovedBy")
                         .HasColumnType("integer");
 
-                    b.Property<string>("CancellationReason")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
                     b.Property<DateTime?>("CancelledAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -498,13 +494,23 @@ namespace WIMS.Infrastructure.Data.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
 
-                    b.Property<DateOnly>("OrderDate")
+                    b.Property<DateOnly?>("OrderDate")
                         .HasColumnType("date");
 
                     b.Property<string>("PoNumber")
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
+
+                    b.Property<DateTime?>("RejectedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("RejectedBy")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("RejectionReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -534,8 +540,16 @@ namespace WIMS.Infrastructure.Data.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("ApprovedBy");
+
+                    b.HasIndex("CancelledBy");
+
                     b.HasIndex("PoNumber")
                         .IsUnique();
+
+                    b.HasIndex("RejectedBy");
+
+                    b.HasIndex("SubmittedBy");
 
                     b.HasIndex("WarehouseId");
 
@@ -1198,7 +1212,7 @@ namespace WIMS.Infrastructure.Data.Migrations
             modelBuilder.Entity("WIMS.Domain.Entity.Bin", b =>
                 {
                     b.HasOne("WIMS.Domain.Entity.Zone", "Zone")
-                        .WithMany()
+                        .WithMany("Bins")
                         .HasForeignKey("ZoneId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
@@ -1327,11 +1341,39 @@ namespace WIMS.Infrastructure.Data.Migrations
 
             modelBuilder.Entity("WIMS.Domain.Entity.PurchaseOrder", b =>
                 {
+                    b.HasOne("WIMS.Domain.Entity.User", "ApprovedByUser")
+                        .WithMany()
+                        .HasForeignKey("ApprovedBy")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("WIMS.Domain.Entity.User", "CancelledByUser")
+                        .WithMany()
+                        .HasForeignKey("CancelledBy")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("WIMS.Domain.Entity.User", "RejectedByUser")
+                        .WithMany()
+                        .HasForeignKey("RejectedBy")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("WIMS.Domain.Entity.User", "SubmittedByUser")
+                        .WithMany()
+                        .HasForeignKey("SubmittedBy")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("WIMS.Domain.Entity.Warehouse", "Warehouse")
                         .WithMany()
                         .HasForeignKey("WarehouseId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.Navigation("ApprovedByUser");
+
+                    b.Navigation("CancelledByUser");
+
+                    b.Navigation("RejectedByUser");
+
+                    b.Navigation("SubmittedByUser");
 
                     b.Navigation("Warehouse");
                 });
@@ -1594,6 +1636,11 @@ namespace WIMS.Infrastructure.Data.Migrations
                     b.Navigation("Users");
 
                     b.Navigation("Zones");
+                });
+
+            modelBuilder.Entity("WIMS.Domain.Entity.Zone", b =>
+                {
+                    b.Navigation("Bins");
                 });
 #pragma warning restore 612, 618
         }

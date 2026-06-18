@@ -20,44 +20,26 @@ public class BinController : ControllerBase
         _binService = binService;
     }
 
-    private int GetCurrentUserId()
-        => int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
     [HttpPost]
-    public async Task<IActionResult> CreateBin(BinCreateRequest request)
+    public async Task<ApiResponse<BinResponse>> CreateBin(BinCreateRequest request)
     {
-        var response = await _binService.CreateBin(request, GetCurrentUserId());
-
-        if (!response.IsSuccess)
-        {
-            if(response.StatusCode == 404)
-                return NotFound(response);
-            return BadRequest(response);
-        }
-
-        return StatusCode(201, response);
+        var response = await _binService.CreateBin(request);
+        return response;
     }
 
     [HttpGet("{id:int}")]
-    public async Task<IActionResult> GetBinById(int id)
+    public async Task<ApiResponse<BinResponse>> GetBinById(int id)
     {
         var response = await _binService.GetBinById(id);
-
-        if (!response.IsSuccess)
-            return NotFound(response);
-
-        return Ok(response);
+        return response;
     }
 
     [HttpDelete("{id:int}")]
-    public async Task<IActionResult> DeleteBin(int id)
+    public async Task<ApiResponse<string>> DeleteBin(int id)
     {
-        var response = await _binService.DeleteBin(id,GetCurrentUserId());
-
-        if (!response.IsSuccess)
-            return NotFound(response);
-
-        return Ok(response);
+        var response = await _binService.DeleteBin(id);
+        return response;
     }
 
     [HttpGet]
@@ -68,33 +50,25 @@ public class BinController : ControllerBase
     }
 
     [HttpGet("all")]
-    public async Task<IActionResult> GetBinsDropdown(
+    public async Task<ApiResponse<List<BinDropdownResponse>>> GetBinsDropdown(
         [FromQuery] int? warehouseId = null,
         [FromQuery] int? zoneId = null)
     {
         var response = await _binService.GetBinsDropdown(warehouseId, zoneId);
-        return Ok(response);
+        return response;
     }
 
     [HttpPatch("{id:int}")]
-    public async Task<IActionResult> UpdateBin(int id, [FromBody] BinUpdateRequest request)
+    public async Task<ApiResponse<BinResponse>> UpdateBin(int id, [FromBody] BinUpdateRequest request)
     {
-        var response = await _binService.UpdateBin(id, request, GetCurrentUserId());
-
-        if (!response.IsSuccess)
-            return StatusCode(response.StatusCode ?? 400, response);
-
-        return Ok(response);
+        var response = await _binService.UpdateBin(id, request);
+        return response;
     }
 
     [HttpPatch("{id:int}/status")]
-    public async Task<IActionResult> UpdateBinStatus(int id, [FromBody] BinStatusUpdateRequest request)
+    public async Task<ApiResponse<string>> UpdateBinStatus(int id, [FromBody] BinStatusUpdateRequest request)
     {
-        var response = await _binService.UpdateBinStatus(id, request, GetCurrentUserId());
-
-        if (!response.IsSuccess)
-            return StatusCode(response.StatusCode ?? 400, response);
-
-        return Ok(response);
+        var response = await _binService.UpdateBinStatus(id, request);
+        return response;
     }
 }

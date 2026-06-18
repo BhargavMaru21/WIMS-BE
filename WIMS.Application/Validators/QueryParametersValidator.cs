@@ -17,7 +17,12 @@ public class QueryParametersValidator : AbstractValidator<QueryParameters>
         "Code",
         "MaxCapacity",
         "Sku",
-        "UnitPrice"
+        "UnitPrice",
+        "PoNumber",
+        "SupplierName",
+        "TotalAmount",
+        "ExpectedDelivery",
+        "OrderDate"
     };
 
     public QueryParametersValidator()
