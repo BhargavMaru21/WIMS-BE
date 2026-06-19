@@ -71,9 +71,38 @@ public class PoService : IPoService
         if (warehouse.Status == EntityStatus.Inactive)
             return ApiResponse<PoResponse>.Failure("Cannot create a purchase order for an inactive warehouse.", statusCode: 400);
 
+        var duplicateProductIds = request.ItemList
+            .GroupBy(i => i.ProductId)
+            .Where(g => g.Count() > 1)
+            .Select(g => g.Key)
+            .ToList();
+
+        if (duplicateProductIds.Any())
+            return ApiResponse<PoResponse>.Failure("Duplicate products not allowed in the item list", statusCode: 400);
+
+        var productLookup = new Dictionary<int, Product>();
+
+        foreach (var item in request.ItemList)
+        {
+            var validationResult = await _validator.ValidateAsync(item);
+
+            if (!validationResult.IsValid)
+            {
+                var errors = validationResult.Errors.Select(e => e.ErrorMessage);
+                return ApiResponse<PoResponse>.Failure($"{string.Join(" ", errors)}");
+            }
+            var product = await _productRepository.GetAsync(p => p.Id == item.ProductId);
+
+            if (product is null)
+                return ApiResponse<PoResponse>.Failure($"Product with ID {item.ProductId} not found.", statusCode: 404);
+
+            if (product.Status == EntityStatus.Inactive)
+                return ApiResponse<PoResponse>.Failure($"Product '{product.Name}' is inactive and cannot be added to a purchase order.", statusCode: 400);
+
+            productLookup[item.ProductId] = product;
+        }
 
         await _poRepository.BeginTransactionAsync();
-
         try
         {
             var entity = _mapper.Map<PurchaseOrder>(request);
@@ -84,28 +113,10 @@ public class PoService : IPoService
             var created = await _poRepository.CreateAsync(entity);
 
             created.PoNumber = _codeGeneratorService.GenerateCode("purchaseorder", created.Id);
-            await _poRepository.SaveChangesAsync();
 
-            var ListOfItems = request.ItemList;
-
-            foreach (var item in ListOfItems)
+            foreach (var item in request.ItemList)
             {
-                var validationResult = await _validator.ValidateAsync(item);
-
-                if (!validationResult.IsValid)
-                {
-                    await _poRepository.RollbackTransactionAsync();
-                    var errors = validationResult.Errors.Select(e => e.ErrorMessage);
-                    return ApiResponse<PoResponse>.Failure($"{string.Join(" ", errors)}");
-                }
-
-                var product = await _productRepository.GetAsync(p => p.Id == item.ProductId);
-
-                if (product is null)
-                    return ApiResponse<PoResponse>.Failure("Product not found.", statusCode: 404);
-
-                if (product.Status == EntityStatus.Inactive)
-                    return ApiResponse<PoResponse>.Failure("Cannot add an inactive product to a purchase order.", statusCode: 400);
+                var product = productLookup[item.ProductId];
 
                 var orderItem = new PurchaseOrderItem
                 {
@@ -118,11 +129,12 @@ public class PoService : IPoService
                     CreatedBy = createdByUserId
                 };
 
+                created.TotalAmount = created.TotalAmount + orderItem.LineTotal;
                 await _poItemRepository.CreateAsync(orderItem);
 
-                created.TotalAmount = created.TotalAmount + orderItem.LineTotal;
-                await _poRepository.SaveChangesAsync();
             }
+
+            await _poRepository.SaveChangesAsync();
 
             var poWithIncludes = await _poRepository.GetAsync(
                 x => x.Id == created.Id,
