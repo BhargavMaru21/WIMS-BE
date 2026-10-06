@@ -35,6 +35,13 @@ public class UnitOfMeasureServiceTests
             _mockCurrentUser.Object);
     }
 
+    private void SetupUomGetAsync(UnitsOfMeasure? Uom)
+    {
+        _mockRepo.Setup(x => x.GetAsync(It.IsAny<Expression<Func<UnitsOfMeasure, bool>>>(),
+                                        It.IsAny<bool>(),
+                                        It.IsAny<Func<IQueryable<UnitsOfMeasure>, IQueryable<UnitsOfMeasure>>>())).ReturnsAsync(Uom);
+    }
+
 
 
     //create
@@ -118,6 +125,64 @@ public class UnitOfMeasureServiceTests
 
 
 
+    //get 
+
+    [Fact]
+    public async Task GetUnitsDropdown_ReturnsAllUnits()
+    {
+        var entities = new List<UnitsOfMeasure>
+        {
+            new() { Id = 1, Name = "Kilogram", Abbreviation = "kg" },
+            new() { Id = 2, Name = "Test", Abbreviation = "tt" }
+        };
+
+        var expectedDtos = new List<UnitResponse>
+        {
+            new() { Id = 1, Name = "Kilogram", Abbreviation = "kg" },
+            new() { Id = 2, Name = "Test", Abbreviation = "tt" }
+        };
+
+        _mockRepo
+            .Setup(x => x.GetAllAsync(
+                It.IsAny<Func<IQueryable<UnitsOfMeasure>, IOrderedQueryable<UnitsOfMeasure>>?>(),
+                It.IsAny<Func<IQueryable<UnitsOfMeasure>, IQueryable<UnitsOfMeasure>>?>()))
+            .ReturnsAsync(entities);
+
+        _mockMapper
+            .Setup(x => x.Map<List<UnitResponse>>(entities))
+            .Returns(expectedDtos);
+
+        var result = await _service.GetUnitsDropdown();
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(200, result.StatusCode);
+        Assert.Equal(2, result.Data!.Count);
+        Assert.Equal("Kilogram", result.Data[0].Name);
+    }
+
+    [Fact]
+    public async Task GetUnitsDropdown_WhenNoUnitsExist_ReturnsEmptyList()
+    {
+        var emptyEntities = new List<UnitsOfMeasure>();
+
+        _mockRepo
+            .Setup(x => x.GetAllAsync(
+                It.IsAny<Func<IQueryable<UnitsOfMeasure>, IOrderedQueryable<UnitsOfMeasure>>?>(),
+                It.IsAny<Func<IQueryable<UnitsOfMeasure>, IQueryable<UnitsOfMeasure>>?>()))
+            .ReturnsAsync(emptyEntities);
+
+        _mockMapper
+            .Setup(x => x.Map<List<UnitResponse>>(emptyEntities))
+            .Returns(new List<UnitResponse>());
+
+        var result = await _service.GetUnitsDropdown();
+
+        Assert.True(result.IsSuccess);
+        Assert.Empty(result.Data!);
+    }
+
+
+
     //update
     [Theory]
     [InlineData(0)]
@@ -138,9 +203,7 @@ public class UnitOfMeasureServiceTests
 
         _mockInputNormalizer.Setup(x => x.NormalizeObject(request)).Returns(request);
 
-        _mockRepo.Setup(x => x.GetAsync(It.IsAny<Expression<Func<UnitsOfMeasure, bool>>>(),
-                                        It.IsAny<bool>(),
-                                        It.IsAny<Func<IQueryable<UnitsOfMeasure>, IQueryable<UnitsOfMeasure>>>())).ReturnsAsync((UnitsOfMeasure?)null);
+        SetupUomGetAsync(null);
 
         var result = await _service.UpdateUnit(99, request);
 
@@ -157,12 +220,7 @@ public class UnitOfMeasureServiceTests
 
         _mockInputNormalizer.Setup(x => x.NormalizeObject(request)).Returns(request);
 
-        _mockRepo
-            .Setup(x => x.GetAsync(
-                It.IsAny<Expression<Func<UnitsOfMeasure, bool>>>(),
-                It.IsAny<bool>(),
-                It.IsAny<Func<IQueryable<UnitsOfMeasure>, IQueryable<UnitsOfMeasure>>?>()))
-            .ReturnsAsync(existingUnit);
+        SetupUomGetAsync(existingUnit);
 
         _mockRepo.Setup(x => x.ExistsAsync(It.IsAny<Expression<Func<UnitsOfMeasure, bool>>>())).ReturnsAsync(true);
 
@@ -182,12 +240,7 @@ public class UnitOfMeasureServiceTests
 
         _mockInputNormalizer.Setup(x => x.NormalizeObject(request)).Returns(request);
 
-        _mockRepo
-            .Setup(x => x.GetAsync(
-                It.IsAny<Expression<Func<UnitsOfMeasure, bool>>>(),
-                It.IsAny<bool>(),
-                It.IsAny<Func<IQueryable<UnitsOfMeasure>, IQueryable<UnitsOfMeasure>>?>()))
-            .ReturnsAsync(existingUnit);
+        SetupUomGetAsync(existingUnit);
 
         _mockRepo
             .Setup(x => x.ExistsAsync(It.IsAny<Expression<Func<UnitsOfMeasure, bool>>>()))
@@ -209,12 +262,7 @@ public class UnitOfMeasureServiceTests
 
         _mockInputNormalizer.Setup(x => x.NormalizeObject(request)).Returns(request);
 
-        _mockRepo
-            .Setup(x => x.GetAsync(
-                It.IsAny<Expression<Func<UnitsOfMeasure, bool>>>(),
-                It.IsAny<bool>(),
-                It.IsAny<Func<IQueryable<UnitsOfMeasure>, IQueryable<UnitsOfMeasure>>?>()))
-            .ReturnsAsync(existingUnit);
+        SetupUomGetAsync(existingUnit);
 
         _mockRepo
             .Setup(x => x.ExistsAsync(It.IsAny<Expression<Func<UnitsOfMeasure, bool>>>()))
@@ -245,12 +293,7 @@ public class UnitOfMeasureServiceTests
 
         _mockInputNormalizer.Setup(x => x.NormalizeObject(request)).Returns(request);
 
-        _mockRepo
-            .Setup(x => x.GetAsync(
-                It.IsAny<Expression<Func<UnitsOfMeasure, bool>>>(),
-                It.IsAny<bool>(),
-                It.IsAny<Func<IQueryable<UnitsOfMeasure>, IQueryable<UnitsOfMeasure>>?>()))
-            .ReturnsAsync(existingUnit);
+        SetupUomGetAsync(existingUnit);
 
         _mockRepo
             .Setup(x => x.ExistsAsync(It.IsAny<Expression<Func<UnitsOfMeasure, bool>>>()))
@@ -289,18 +332,13 @@ public class UnitOfMeasureServiceTests
     [Fact]
     public async Task DeleteUnit_GivenUnitDoesNotExist_ReturnsFailure()
     {
-        _mockRepo
-            .Setup(x => x.GetAsync(
-                It.IsAny<Expression<Func<UnitsOfMeasure, bool>>>(),
-                It.IsAny<bool>(),
-                It.IsAny<Func<IQueryable<UnitsOfMeasure>, IQueryable<UnitsOfMeasure>>?>()))
-            .ReturnsAsync((UnitsOfMeasure?)null);
+        SetupUomGetAsync(null);
 
         var result = await _service.DeleteUnit(1);
 
         Assert.False(result.IsSuccess);
         Assert.Equal(404, result.StatusCode);
-        Assert.Equal("Unit not Found",result.Message);
+        Assert.Equal("Unit not Found", result.Message);
     }
 
     [Fact]
@@ -308,12 +346,7 @@ public class UnitOfMeasureServiceTests
     {
         var existingUnit = new UnitsOfMeasure { Id = 5, Name = "Test", Abbreviation = "tt" };
 
-        _mockRepo
-            .Setup(x => x.GetAsync(
-                It.IsAny<Expression<Func<UnitsOfMeasure, bool>>>(),
-                It.IsAny<bool>(),
-                It.IsAny<Func<IQueryable<UnitsOfMeasure>, IQueryable<UnitsOfMeasure>>?>()))
-            .ReturnsAsync(existingUnit);
+       SetupUomGetAsync(existingUnit);
 
         _mockRepo.Setup(x => x.IsAssignedToProductAsync(5)).ReturnsAsync(true);
 
@@ -328,12 +361,7 @@ public class UnitOfMeasureServiceTests
     {
         var existingUnit = new UnitsOfMeasure { Id = 5, Name = "Test", Abbreviation = "tt" };
 
-        _mockRepo
-            .Setup(x => x.GetAsync(
-                It.IsAny<Expression<Func<UnitsOfMeasure, bool>>>(),
-                It.IsAny<bool>(),
-                It.IsAny<Func<IQueryable<UnitsOfMeasure>, IQueryable<UnitsOfMeasure>>?>()))
-            .ReturnsAsync(existingUnit);
+        SetupUomGetAsync(existingUnit);
 
         _mockRepo.Setup(x => x.IsAssignedToProductAsync(5)).ReturnsAsync(false);
         _mockRepo.Setup(x => x.DeleteAsync(existingUnit)).ReturnsAsync(true);
