@@ -26,6 +26,11 @@ public class PoCreateRequestValidator : AbstractValidator<PoCreateRequest>
         RuleFor(x => x.Notes)
             .MaximumLength(1000).WithMessage("Notes must not exceed 1000 characters.")
             .When(x => !string.IsNullOrWhiteSpace(x.Notes));
+
+        RuleFor(x => x.ItemList)
+            .NotEmpty().WithMessage("At least one item is required.");
+ 
+        RuleForEach(x => x.ItemList).SetValidator(new PoItemCreateRequestValidator());
     }
 }
 
