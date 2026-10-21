@@ -9,6 +9,8 @@ public class CreateUserRequestValidator : AbstractValidator<CreateUserRequest>
     {
         RuleFor(x => x.FullName)
             .NotEmpty().WithMessage("Full name is required.")
+            .Matches(@"^[a-zA-Z\s]+$").WithMessage("Full name can only contain letters and spaces.")
+            .MinimumLength(2).WithMessage("Full name must contain at least 2 characters")
             .MaximumLength(150).WithMessage("Full name cannot exceed 150 characters.");
  
         RuleFor(x => x.Email)

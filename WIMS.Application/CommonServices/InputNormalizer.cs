@@ -12,7 +12,7 @@ public class InputNormalizer : IInputNormalizer
 
     public string NormalizeEmail(string value)
     {
-        return value.Trim().ToLower();
+    return value.Trim().ToLower();
     }
 
     public T NormalizeObject<T>(T obj)

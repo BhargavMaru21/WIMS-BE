@@ -3,6 +3,7 @@ using System.Text.Json.Serialization;
 using FluentValidation;
 using FluentValidation.AspNetCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
@@ -11,18 +12,33 @@ using Serilog.Events;
 using WIMS.Api.Middlewares;
 using WIMS.Application.Common.Services;
 using WIMS.Application.CommonServices;
+using WIMS.Application.DTOs;
 using WIMS.Application.Interfaces.Common;
 using WIMS.Application.Interfaces.Repositories;
 using WIMS.Application.Interfaces.Services.Admin;
+using WIMS.Application.Interfaces.Services.Audit;
 using WIMS.Application.Interfaces.Services.Auth;
+using WIMS.Application.Interfaces.Services.ProductCategory;
+using WIMS.Application.Interfaces.Services.Profile;
+using WIMS.Application.Interfaces.Services.UnitOfMeasure;
+using WIMS.Application.Interfaces.Services.WarehouseManagement;
 using WIMS.Application.Mappings;
 using WIMS.Application.Service.Admin;
+using WIMS.Application.Service.Audit;
 using WIMS.Application.Service.Auth;
+using WIMS.Application.Service;
+using WIMS.Application.Service.Profile;
+using WIMS.Application.Service.UnitOfMeasure;
+using WIMS.Application.Service.WarehouseManagement;
 using WIMS.Application.Validators.Admin;
 using WIMS.Infrastructure.Data;
 using WIMS.Infrastructure.Data.Seeder.Implementation;
 using WIMS.Infrastructure.Data.Seeder.Interface;
 using WIMS.Infrastructure.Repository;
+using WIMS.Application.Interfaces.Services.Products;
+using WIMS.Application.Service.Products;
+using WIMS.Application.Interfaces.Services.PurchaseOrder;
+using WIMS.Application.Interfaces.Services;
 var builder = WebApplication.CreateBuilder(args);
 
 
@@ -31,7 +47,7 @@ builder.Services.AddSwaggerGen(options =>
 {
     options.SwaggerDoc("v1", new OpenApiInfo
     {
-        Title = "DesignPatternDemo API",
+        Title = "WIMS API",
         Version = "v1"
     });
 
@@ -79,49 +95,87 @@ builder.Services.AddCors(options =>
 );
 
 builder.Services.AddControllers()
+    .ConfigureApiBehaviorOptions(options =>
+    {
+        options.InvalidModelStateResponseFactory = context =>
+        {
+            var errors = context.ModelState
+                .Where(x => x.Value?.Errors.Count > 0)
+                .SelectMany(x => x.Value!.Errors.Select(e => e.ErrorMessage))
+                .ToList();
+
+            var response = ApiResponse<object>.Failure(
+                message: "Validation failed.",
+                errors: errors,
+                statusCode: 400
+            );
+
+            return new BadRequestObjectResult(response);
+        };
+    })
     .AddJsonOptions(options =>
     {
         options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
     });
- 
+
 
 //fluent validation
 builder.Services.AddFluentValidationAutoValidation();
+ValidatorOptions.Global.DefaultRuleLevelCascadeMode = CascadeMode.Stop;
 builder.Services.AddValidatorsFromAssemblyContaining<CreateUserRequestValidator>();
 
 //DI
+//Helper
+builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ISeeder, Seeder>();
-builder.Services.AddScoped<IInputNormalizer,InputNormalizer>();
-builder.Services.AddScoped<IPasswordHasher, PasswordHasher>();
-builder.Services.AddScoped<IJwtService, JwtService>();
-builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddSingleton<IInputNormalizer, InputNormalizer>();
+builder.Services.AddSingleton<IPasswordHasher, PasswordHasher>();
+builder.Services.AddSingleton<ICodeGeneratorService, CodeGeneratorService>();
+builder.Services.AddSingleton<IJwtService, JwtService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
+builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
+
+
+//Services
+builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IAuditService, AuditService>();
+builder.Services.AddScoped<IUserProfileService, UserProfileService>();
 builder.Services.AddScoped<IAdminUserManagementService, AdminUserManagementService>();
+builder.Services.AddScoped<IWarehouseService, WarehouseService>();
+builder.Services.AddScoped<IZoneService, ZoneService>();
+builder.Services.AddScoped<ZoneService>();
+builder.Services.AddScoped<IBinService, BinService>();
+builder.Services.AddScoped<IUnitOfMeasureService, UnitOfMeasureService>();
+builder.Services.AddScoped<IProductCategoryService, ProductCategoryService>();
+builder.Services.AddScoped<IProductService, ProductService>();
+builder.Services.AddScoped<IPoService,PoService>();
+builder.Services.AddScoped<IGrService,GrService>();
+
+
+//repositories
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IWarehouseRepository, WarehouseRepository>();
 builder.Services.AddScoped<IZoneRepository, ZoneRepository>();
 builder.Services.AddScoped<IBinRepository, BinRepository>();
-builder.Services.AddScoped<IProductCategoryRepository, ProductCategoryRepository>();
-builder.Services.AddScoped<IUnitsOfMeasureRepository, UnitsOfMeasureRepository>();
-builder.Services.AddScoped<IProductRepository, ProductRepository>();
-builder.Services.AddScoped<IStockRecordRepository, StockRecordRepository>();
-builder.Services.AddScoped<IStockMovementRepository, StockMovementRepository>();
-builder.Services.AddScoped<IPurchaseOrderRepository, PurchaseOrderRepository>();
-builder.Services.AddScoped<IPurchaseOrderItemRepository, PurchaseOrderItemRepository>();
-builder.Services.AddScoped<IGoodsReceiptRepository, GoodsReceiptRepository>();
-builder.Services.AddScoped<IGoodsReceiptItemRepository, GoodsReceiptItemRepository>();
-builder.Services.AddScoped<IGoodsDispatchRepository, GoodsDispatchRepository>();
-builder.Services.AddScoped<IGoodsDispatchItemRepository, GoodsDispatchItemRepository>();
-builder.Services.AddScoped<IStockTransferRepository, StockTransferRepository>();
-builder.Services.AddScoped<IStockTransferItemRepository, StockTransferItemRepository>();
-builder.Services.AddScoped<IStockAdjustmentRepository, StockAdjustmentRepository>();
-builder.Services.AddScoped<IReorderAlertRepository, ReorderAlertRepository>();
 builder.Services.AddScoped<IAuditLogRepository, AuditLogRepository>();
+builder.Services.AddScoped<IUnitOfMeasureRepository,UnitOfMeasureRepository>();
+builder.Services.AddScoped<IProductCategoryRepository, ProductCategoryRepository>();
+builder.Services.AddScoped<IProductRepository, ProductRepository>();
+builder.Services.AddScoped<IPoRepository , PoRepository>();
+builder.Services.AddScoped<IPoItemRepository,PoItemRepository>();
+builder.Services.AddScoped<IGrRepository,GrRepository>();
+builder.Services.AddScoped<IGrItemRepository,GrItemRepository>();
+builder.Services.AddScoped<IStockRecordRepository,StockRecordRepository>();
+builder.Services.AddScoped<IStockMovementRepository,StockMovementRepository>();
+
 
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"), npgsql => npgsql.MigrationsAssembly("WIMS.Infrastructure")));
 
-builder.Services.AddAutoMapper(typeof(UserMappingProfile).Assembly);
+builder.Services.AddAutoMapper(cfg =>
+{
+    cfg.AddMaps(typeof(UserMappingProfile).Assembly);
+});
 
 //jwt authenticationcd
 builder.Services.AddAuthentication(option =>

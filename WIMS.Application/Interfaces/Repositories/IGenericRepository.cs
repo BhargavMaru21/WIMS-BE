@@ -28,6 +28,7 @@ public interface IGenericRepository<T> where T : class, IEntity
     Task StageUpdateAsync(T entity);       
     Task<T> UpdateAsync(T entity);
     Task<bool> DeleteAsync(T entity);
+    Task<bool> SoftDeleteAsync(T entity, int deletedBy);
     Task<bool> SaveChangesAsync();
 
     //helper

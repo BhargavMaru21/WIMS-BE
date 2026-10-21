@@ -148,6 +148,7 @@ public class AuditLogConfiguration : IEntityTypeConfiguration<AuditLog>
 
         b.Property(x => x.EntityName).HasMaxLength(100).IsRequired();
         b.Property(x => x.EntityId).HasMaxLength(20).IsRequired();
+        b.Property(x => x.ActionType).HasMaxLength(50).IsRequired();
         b.Property(x => x.PerformedAt).IsRequired();
 
         b.HasOne(x => x.PerformedByUser)

@@ -14,6 +14,6 @@ public class QueryParameters
 
     public string? Search { get; set; }
     public string? SortBy { get; set; }
-    public bool SortDesc { get; set; } = false;
+    public string SortDirection { get; set; } = "desc";
     public Dictionary<string, string> Filters { get; set; } = new();
 }

@@ -17,7 +17,7 @@ namespace WIMS.Infrastructure.Data.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.3")
+                .HasAnnotation("ProductVersion", "10.0.8")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -32,7 +32,8 @@ namespace WIMS.Infrastructure.Data.Migrations
 
                     b.Property<string>("ActionType")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
 
                     b.Property<string>("EntityId")
                         .IsRequired()
@@ -81,6 +82,15 @@ namespace WIMS.Infrastructure.Data.Migrations
 
                     b.Property<int?>("CreatedBy")
                         .HasColumnType("integer");
+
+                    b.Property<int?>("DeletedBy")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("DeletedOn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
 
                     b.Property<decimal>("MaxCapacity")
                         .HasPrecision(12, 2)
@@ -339,9 +349,18 @@ namespace WIMS.Infrastructure.Data.Migrations
                     b.Property<int?>("CreatedBy")
                         .HasColumnType("integer");
 
+                    b.Property<int?>("DeletedBy")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("DeletedOn")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("Description")
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
 
                     b.Property<DateTime?>("ModifiedAt")
                         .HasColumnType("timestamp with time zone");
@@ -400,9 +419,18 @@ namespace WIMS.Infrastructure.Data.Migrations
                     b.Property<int?>("CreatedBy")
                         .HasColumnType("integer");
 
+                    b.Property<int?>("DeletedBy")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("DeletedOn")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("Description")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
 
                     b.Property<DateTime?>("ModifiedAt")
                         .HasColumnType("timestamp with time zone");
@@ -441,10 +469,6 @@ namespace WIMS.Infrastructure.Data.Migrations
                     b.Property<int?>("ApprovedBy")
                         .HasColumnType("integer");
 
-                    b.Property<string>("CancellationReason")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
                     b.Property<DateTime?>("CancelledAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -470,13 +494,23 @@ namespace WIMS.Infrastructure.Data.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
 
-                    b.Property<DateOnly>("OrderDate")
+                    b.Property<DateOnly?>("OrderDate")
                         .HasColumnType("date");
 
                     b.Property<string>("PoNumber")
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
+
+                    b.Property<DateTime?>("RejectedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("RejectedBy")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("RejectionReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -489,8 +523,8 @@ namespace WIMS.Infrastructure.Data.Migrations
                         .HasColumnType("integer");
 
                     b.Property<string>("SupplierContact")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
 
                     b.Property<string>("SupplierName")
                         .IsRequired()
@@ -506,8 +540,16 @@ namespace WIMS.Infrastructure.Data.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("ApprovedBy");
+
+                    b.HasIndex("CancelledBy");
+
                     b.HasIndex("PoNumber")
                         .IsUnique();
+
+                    b.HasIndex("RejectedBy");
+
+                    b.HasIndex("SubmittedBy");
 
                     b.HasIndex("WarehouseId");
 
@@ -951,6 +993,12 @@ namespace WIMS.Infrastructure.Data.Migrations
                     b.Property<int?>("CreatedBy")
                         .HasColumnType("integer");
 
+                    b.Property<int?>("DeletedBy")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("DeletedOn")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("Email")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -963,6 +1011,9 @@ namespace WIMS.Infrastructure.Data.Migrations
                         .IsRequired()
                         .HasMaxLength(150)
                         .HasColumnType("character varying(150)");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
 
                     b.Property<DateTime?>("LastLoginAt")
                         .HasColumnType("timestamp with time zone");
@@ -981,15 +1032,23 @@ namespace WIMS.Infrastructure.Data.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
+                    b.Property<DateTime?>("PasswordResetTokenExpiry")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("PasswordResetTokenHash")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
                     b.Property<string>("PhoneNumber")
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)");
 
-                    b.Property<string>("RefreshToken")
-                        .HasColumnType("text");
-
                     b.Property<DateTime?>("RefreshTokenExpiryTime")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("RefreshTokenHash")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
 
                     b.Property<string>("Role")
                         .IsRequired()
@@ -1051,6 +1110,15 @@ namespace WIMS.Infrastructure.Data.Migrations
                     b.Property<int?>("CreatedBy")
                         .HasColumnType("integer");
 
+                    b.Property<int?>("DeletedBy")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("DeletedOn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
                     b.Property<DateTime?>("ModifiedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -1092,6 +1160,15 @@ namespace WIMS.Infrastructure.Data.Migrations
 
                     b.Property<int?>("CreatedBy")
                         .HasColumnType("integer");
+
+                    b.Property<int?>("DeletedBy")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("DeletedOn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
 
                     b.Property<DateTime?>("ModifiedAt")
                         .HasColumnType("timestamp with time zone");
@@ -1135,7 +1212,7 @@ namespace WIMS.Infrastructure.Data.Migrations
             modelBuilder.Entity("WIMS.Domain.Entity.Bin", b =>
                 {
                     b.HasOne("WIMS.Domain.Entity.Zone", "Zone")
-                        .WithMany()
+                        .WithMany("Bins")
                         .HasForeignKey("ZoneId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
@@ -1264,11 +1341,39 @@ namespace WIMS.Infrastructure.Data.Migrations
 
             modelBuilder.Entity("WIMS.Domain.Entity.PurchaseOrder", b =>
                 {
+                    b.HasOne("WIMS.Domain.Entity.User", "ApprovedByUser")
+                        .WithMany()
+                        .HasForeignKey("ApprovedBy")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("WIMS.Domain.Entity.User", "CancelledByUser")
+                        .WithMany()
+                        .HasForeignKey("CancelledBy")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("WIMS.Domain.Entity.User", "RejectedByUser")
+                        .WithMany()
+                        .HasForeignKey("RejectedBy")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("WIMS.Domain.Entity.User", "SubmittedByUser")
+                        .WithMany()
+                        .HasForeignKey("SubmittedBy")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("WIMS.Domain.Entity.Warehouse", "Warehouse")
                         .WithMany()
                         .HasForeignKey("WarehouseId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.Navigation("ApprovedByUser");
+
+                    b.Navigation("CancelledByUser");
+
+                    b.Navigation("RejectedByUser");
+
+                    b.Navigation("SubmittedByUser");
 
                     b.Navigation("Warehouse");
                 });
@@ -1531,6 +1636,11 @@ namespace WIMS.Infrastructure.Data.Migrations
                     b.Navigation("Users");
 
                     b.Navigation("Zones");
+                });
+
+            modelBuilder.Entity("WIMS.Domain.Entity.Zone", b =>
+                {
+                    b.Navigation("Bins");
                 });
 #pragma warning restore 612, 618
         }

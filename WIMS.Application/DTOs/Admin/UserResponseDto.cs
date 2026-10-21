@@ -9,7 +9,7 @@ public class UserResponseDto
     public required string Email { get; set; }
     public string? PhoneNumber { get; set; }
     public required UserRole Role { get; set; }
-    public required EntityStatus Status { get; set; }
+    public required UserStatus Status { get; set; }
     public int? WarehouseId { get; set; }
     public string? WarehouseName { get; set; }
     public DateTime? LastLoginAt { get; set; }

@@ -16,13 +16,38 @@ public class PurchaseOrderConfiguration : IEntityTypeConfiguration<PurchaseOrder
         b.Property(x => x.SupplierContact).HasMaxLength(20);
         b.Property(x => x.TotalAmount).HasPrecision(16, 2).IsRequired();
         b.Property(x => x.Notes).HasMaxLength(1000);
-        b.Property(x => x.CancellationReason).HasMaxLength(500);
+        b.Property(x => x.RejectionReason).HasMaxLength(500);
 
         b.HasOne(x => x.Warehouse)
             .WithMany()
             .HasForeignKey(x => x.WarehouseId)
             .IsRequired(true)
             .OnDelete(DeleteBehavior.Restrict);
+            
+         b.HasOne(x => x.SubmittedByUser)
+            .WithMany()
+            .HasForeignKey(x => x.SubmittedBy)
+            .IsRequired(false)
+            .OnDelete(DeleteBehavior.Restrict);
+ 
+        b.HasOne(x => x.ApprovedByUser)
+            .WithMany()
+            .HasForeignKey(x => x.ApprovedBy)
+            .IsRequired(false)
+            .OnDelete(DeleteBehavior.Restrict);
+ 
+        b.HasOne(x => x.RejectedByUser)
+            .WithMany()
+            .HasForeignKey(x => x.RejectedBy)
+            .IsRequired(false)
+            .OnDelete(DeleteBehavior.Restrict);
+ 
+        b.HasOne(x => x.CancelledByUser)
+            .WithMany()
+            .HasForeignKey(x => x.CancelledBy)
+            .IsRequired(false)
+            .OnDelete(DeleteBehavior.Restrict);
+ 
     }
 }
 

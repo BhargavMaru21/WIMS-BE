@@ -1,10 +1,11 @@
+using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using WIMS.Domain.Entity;
 
 namespace WIMS.Infrastructure.Data;
 
-public class AppDbContext: DbContext
+public class AppDbContext : DbContext
 {
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options)
     {
@@ -29,14 +30,14 @@ public class AppDbContext: DbContext
     public DbSet<StockAdjustment> StockAdjustments => Set<StockAdjustment>();
     public DbSet<ReorderAlert> ReorderAlerts => Set<ReorderAlert>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
- 
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
- 
+
         //Apply all IEntityTypeConfiguration<T> classes from Configurations folder
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
- 
+
         foreach (var entityType in modelBuilder.Model.GetEntityTypes())
         {
             foreach (var property in entityType.GetProperties())
@@ -45,10 +46,21 @@ public class AppDbContext: DbContext
                 {
                     var converterType = typeof(EnumToStringConverter<>)
                         .MakeGenericType(property.ClrType);
- 
+
                     var converter = (ValueConverter)Activator.CreateInstance(converterType)!;
                     property.SetValueConverter(converter);
                 }
+            }
+            // Auto soft-delete filter 
+            if (typeof(ISoftDelete).IsAssignableFrom(entityType.ClrType))
+            {
+                var param = Expression.Parameter(entityType.ClrType, "e");
+                var prop = Expression.Property(param, nameof(ISoftDelete.IsDeleted));
+                var filter = Expression.Lambda(
+                    Expression.Equal(prop, Expression.Constant(false)),
+                    param
+                );
+                modelBuilder.Entity(entityType.ClrType).HasQueryFilter(filter);
             }
         }
     }

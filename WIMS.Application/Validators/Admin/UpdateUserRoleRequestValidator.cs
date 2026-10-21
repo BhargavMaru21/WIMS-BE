@@ -15,12 +15,12 @@ public class UpdateUserRoleRequestValidator : AbstractValidator<UpdateUserRoleRe
                        || role == UserRole.Viewer)
             .WithMessage("Only WarehouseManager, StockKeeper, or Viewer can be assigned.");
  
-        RuleFor(x => x.WarehouseId)
-            .NotNull()
-            .WithMessage("Warehouse is required for WarehouseManager and StockKeeper.")
-            .GreaterThan(0)
-            .WithMessage("Warehouse ID must be a valid positive number.")
-            .When(x => x.Role == UserRole.WarehouseManager || x.Role == UserRole.StockKeeper);
+        // RuleFor(x => x.WarehouseId)
+        //     .NotNull()
+        //     .WithMessage("Warehouse is required for WarehouseManager and StockKeeper.")
+        //     .GreaterThan(0)
+        //     .WithMessage("Warehouse ID must be a valid positive number.")
+        //     .When(x => x.Role == UserRole.WarehouseManager || x.Role == UserRole.StockKeeper);
  
         RuleFor(x => x.WarehouseId)
             .Null()

@@ -11,8 +11,18 @@ public class QueryParametersValidator : AbstractValidator<QueryParameters>
         "Id",
         "Name",
         "FullName",
+        "Email",
         "CreatedAt",
-        "UpdatedAt"
+        "UpdatedAt",
+        "Code",
+        "MaxCapacity",
+        "Sku",
+        "UnitPrice",
+        "PoNumber",
+        "SupplierName",
+        "TotalAmount",
+        "ExpectedDelivery",
+        "OrderDate"
     };
 
     public QueryParametersValidator()
@@ -34,6 +44,11 @@ public class QueryParametersValidator : AbstractValidator<QueryParameters>
             .Must(BeValidSortField)
             .When(x => !string.IsNullOrWhiteSpace(x.SortBy))
             .WithMessage($"SortBy must be one of the following: {string.Join(", ", AllowedSortFields)}.");
+
+        RuleFor(x => x.SortDirection)
+            .Must(sortDirection => sortDirection == "asc" || sortDirection == "desc")
+            .WithMessage("Sort Direction must be asc or desc");
+
 
         RuleFor(x => x.Filters)
             .Must(filters => filters.Count <= 20)
@@ -59,6 +74,6 @@ public class QueryParametersValidator : AbstractValidator<QueryParameters>
         if (string.IsNullOrWhiteSpace(sortBy))
             return true;
 
-        return AllowedSortFields.Contains(sortBy);
+        return AllowedSortFields.Contains(sortBy,StringComparer.OrdinalIgnoreCase);
     }
 }

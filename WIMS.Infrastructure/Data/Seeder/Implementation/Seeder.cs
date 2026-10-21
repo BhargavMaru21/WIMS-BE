@@ -32,7 +32,7 @@ public class Seeder : ISeeder
                 Email = "plutus1920@gmail.com",
                 PasswordHash =  _passwordHasher.Hash("Admin@123"),
                 Role =UserRole.Administrator,
-                Status = EntityStatus.Active
+                Status = UserStatus.Active
             };
             _context.Users.Add(adminUser);
             await _context.SaveChangesAsync();

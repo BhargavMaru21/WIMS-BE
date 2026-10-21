@@ -78,8 +78,26 @@ public class GenericRepository<T> : IGenericRepository<T> where T : class, IEnti
             }
             else if (prop.PropertyType == typeof(int))
             {
-                if (int.TryParse(filter.Value, out var intVal))
-                    condition = Expression.Equal(propExpr, Expression.Constant(intVal));
+                var values = filter.Value
+                    .Split(',', StringSplitOptions.RemoveEmptyEntries)
+                    .Select(v => v.Trim())
+                    .ToArray();
+
+                if (values.Length > 1)
+                {
+                    var ids = values.Select(int.Parse).ToList();
+
+                    condition = Expression.Call(
+                        Expression.Constant(ids),
+                        typeof(List<int>).GetMethod(nameof(List<int>.Contains), new[] { typeof(int) })!,
+                        propExpr);
+                }
+                else if (int.TryParse(filter.Value, out var intVal))
+                {
+                    condition = Expression.Equal(
+                        propExpr,
+                        Expression.Constant(intVal));
+                }
             }
             else if (prop.PropertyType == typeof(int?))
             {
@@ -93,12 +111,46 @@ public class GenericRepository<T> : IGenericRepository<T> where T : class, IEnti
             }
             else if (prop.PropertyType.IsEnum)
             {
-                try
+                var values = filter.Value
+                 .Split(',', StringSplitOptions.RemoveEmptyEntries)
+                 .Select(v => v.Trim())
+                 .ToList();
+
+                if (values.Count > 1)
                 {
-                    var enumVal = Enum.Parse(prop.PropertyType, filter.Value, ignoreCase: true);
-                    condition = Expression.Equal(propExpr, Expression.Constant(enumVal, prop.PropertyType));
+                    var enumList = new List<object>();
+                    foreach (var v in values)
+                    {
+                        try { enumList.Add(Enum.Parse(prop.PropertyType, v, ignoreCase: true)); }
+                        catch { }
+                    }
+
+                    if (enumList.Count > 0)
+                    {
+                        var typedArray = Array.CreateInstance(prop.PropertyType, enumList.Count);
+                        for (int i = 0; i < enumList.Count; i++)
+                            typedArray.SetValue(enumList[i], i);
+
+                        var containsMethod = typeof(Enumerable)
+                            .GetMethods()
+                            .First(m => m.Name == nameof(Enumerable.Contains) && m.GetParameters().Length == 2)
+                            .MakeGenericMethod(prop.PropertyType);
+
+                        condition = Expression.Call(
+                            containsMethod,
+                            Expression.Constant(typedArray),
+                            propExpr);
+                    }
                 }
-                catch { }
+                else
+                {
+                    try
+                    {
+                        var enumVal = Enum.Parse(prop.PropertyType, filter.Value, ignoreCase: true);
+                        condition = Expression.Equal(propExpr, Expression.Constant(enumVal, prop.PropertyType));
+                    }
+                    catch { }
+                }
             }
 
             if (condition is not null)
@@ -140,12 +192,10 @@ public class GenericRepository<T> : IGenericRepository<T> where T : class, IEnti
                 query = query.Where(Expression.Lambda<Func<T, bool>>(combined, param));
         }
 
-        // ── 4. Count BEFORE pagination ────────────────────────────
+        //Total Count 
         var totalCount = await query.CountAsync();
 
-        // ── 5. Sorting ────────────────────────────────────────────
-        // If sortBy is given and matches a property name, sort by it.
-        // Otherwise fall back to CreatedAt DESC (or Id DESC if no CreatedAt).
+        //Sorting 
         if (!string.IsNullOrWhiteSpace(qp.SortBy))
         {
             var prop = typeof(T).GetProperty(
@@ -155,7 +205,7 @@ public class GenericRepository<T> : IGenericRepository<T> where T : class, IEnti
             {
                 var param = Expression.Parameter(typeof(T), "x");
                 var keySelector = Expression.Lambda(Expression.Property(param, prop), param);
-                var methodName = qp.SortDesc ? "OrderByDescending" : "OrderBy";
+                var methodName = qp.SortDirection == "desc" ? "OrderByDescending" : "OrderBy";
 
                 var ordered = typeof(Queryable)
                     .GetMethods()
@@ -183,7 +233,7 @@ public class GenericRepository<T> : IGenericRepository<T> where T : class, IEnti
             }
         }
 
-        // ── 6. Pagination ─────────────────────────────────────────
+        //Pagination
         var items = await query
             .Skip((qp.PageNumber - 1) * qp.PageSize)
             .Take(qp.PageSize)
@@ -229,6 +279,20 @@ public class GenericRepository<T> : IGenericRepository<T> where T : class, IEnti
         _dbSet.Remove(entity);
         await _db.SaveChangesAsync();
         return true;
+    }
+
+    public async Task<bool> SoftDeleteAsync(T entity, int deletedBy)
+    {
+        if (entity is ISoftDelete softDeletable)
+        {
+            softDeletable.IsDeleted = true;
+            softDeletable.DeletedBy = deletedBy;
+            softDeletable.DeletedOn = DateTime.UtcNow;
+            _db.Update(entity);
+            await _db.SaveChangesAsync();
+            return true;
+        }
+        return false;
     }
 
     public async Task<bool> SaveChangesAsync()

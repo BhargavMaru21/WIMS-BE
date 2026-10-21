@@ -18,6 +18,8 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
         b.Property(x => x.PhoneNumber).HasMaxLength(30);
         b.Property(x => x.Role).IsRequired();
         b.Property(x => x.CreatedAt).IsRequired();
+        b.Property(x => x.RefreshTokenHash).HasMaxLength(500);
+        b.Property(x => x.PasswordResetTokenHash).HasMaxLength(500);
         b.HasOne(x => x.Warehouse)
             .WithMany(w => w.Users)
             .HasForeignKey(x => x.WarehouseId)
@@ -73,7 +75,7 @@ public class BinConfiguration : IEntityTypeConfiguration<Bin>
         b.Property(x => x.MaxCapacity).HasPrecision(12, 2);
 
         b.HasOne(x => x.Zone)
-            .WithMany()
+            .WithMany(z => z.Bins)
             .HasForeignKey(x => x.ZoneId)
             .IsRequired(true)
             .OnDelete(DeleteBehavior.Restrict);
