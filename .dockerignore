@@ -1,0 +1,15 @@
+**/bin/
+**/obj/
+.git/
+.vs/
+.vscode/
+logs/
+TestResults/
+*.user
+*.suo
+.env
+.env.*
+!.env.example
+secrets/
+backup.sql
+*.bak
