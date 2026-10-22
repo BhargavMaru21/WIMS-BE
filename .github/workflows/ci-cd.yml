@@ -59,7 +59,7 @@ jobs:
         with:
           images: bhargavmaru/wims-api
           tags: |
-            type=sha,prefix=sha-,format=long
+            type=sha,prefix=sha-,format=short
             type=raw,value=latest
 
       - name: Build and push image
@@ -92,7 +92,7 @@ jobs:
 
           path = Path("values.yaml")
           content = path.read_text()
-          tag = os.environ["IMAGE_TAG"]
+          tag = os.environ["IMAGE_TAG"][:11]
 
           pattern = r'(?ms)(^api:\s*\n.*?^\s+tag:\s*)["\']?[^"\']+["\']?'
           updated, count = re.subn(
