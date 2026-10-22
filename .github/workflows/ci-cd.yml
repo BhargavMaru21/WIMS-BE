@@ -35,7 +35,7 @@ jobs:
         run: dotnet test WIMS.Tests/WIMS.Tests.csproj --configuration Release --no-build --logger "trx;LogFileName=test-results.trx"
 
   build-and-push:
-    name: Build and Push Docker Image
+    name: Build, Push and Update GitOps
     needs: build-and-test
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
@@ -59,7 +59,7 @@ jobs:
         with:
           images: bhargavmaru/wims-api
           tags: |
-            type=sha,prefix=sha-
+            type=sha,prefix=sha-,format=long
             type=raw,value=latest
 
       - name: Build and push image
@@ -70,3 +70,53 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+
+      - name: Checkout GitOps repository
+        uses: actions/checkout@v6
+        with:
+          repository: BhargavMaru21/WIMS-GitOps
+          ref: main
+          token: ${{ secrets.GITOPS_TOKEN }}
+          path: gitops
+
+      - name: Update backend image tag
+        env:
+          IMAGE_TAG: sha-${{ github.sha }}
+        run: |
+          cd gitops
+
+          python - <<'PY'
+          import os
+          import re
+          from pathlib import Path
+
+          path = Path("values.yaml")
+          content = path.read_text()
+          tag = os.environ["IMAGE_TAG"]
+
+          pattern = r'(?ms)(^api:\s*\n.*?^\s+tag:\s*)["\']?[^"\']+["\']?'
+          updated, count = re.subn(
+              pattern,
+              lambda m: m.group(1) + '"' + tag + '"',
+              content,
+              count=1
+          )
+
+          if count != 1:
+              raise SystemExit("Could not locate api.image.tag")
+
+          path.write_text(updated)
+          PY
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add values.yaml
+
+          if ! git diff --cached --quiet; then
+            git commit -m "Deploy WIMS API ${IMAGE_TAG}"
+            git fetch origin main
+            git rebase origin/main
+            git push origin HEAD:main
+          else
+            echo "Backend image tag is already up to date."
+          fi
