@@ -13,7 +13,12 @@ public static class HelperService
 
     public static DateTime ToIST(DateTime utcTime)
     {
-        TimeZoneInfo ist = TimeZoneInfo.FindSystemTimeZoneById("India Standard Time");
+
+        var timeZoneId = OperatingSystem.IsWindows()
+       ? "India Standard Time"
+       : "Asia/Kolkata";
+
+        TimeZoneInfo ist = TimeZoneInfo.FindSystemTimeZoneById(timeZoneId);
         return TimeZoneInfo.ConvertTimeFromUtc(utcTime, ist);
     }
 }
