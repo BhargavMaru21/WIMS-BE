@@ -47,99 +47,99 @@ public class UserProfileServiceTests
     }
 
 
-    // [Fact]
-    // public async Task GetProfile_GivenUserNotFound_ReturnsNotFound()
-    // {
-    //     _mockCurrentUser.Setup(x => x.GetUserId()).Returns(5);
-    //     SetupUserGetAsync(null);
+    [Fact]
+    public async Task GetProfile_GivenUserNotFound_ReturnsNotFound()
+    {
+        _mockCurrentUser.Setup(x => x.GetUserId()).Returns(5);
+        SetupUserGetAsync(null);
 
-    //     var result = await _service.GetProfile();
+        var result = await _service.GetProfile();
 
-    //     Assert.False(result.IsSuccess);
-    //     Assert.Equal(404, result.StatusCode);
-    // }
+        Assert.False(result.IsSuccess);
+        Assert.Equal(404, result.StatusCode);
+    }
 
-    // [Fact]
-    // public async Task GetProfile_GivenExistingUser_ReturnsSuccessWithMappedData()
-    // {
-    //     var user = new User { Id = 5, FullName = "Test", Email = "test@gmail.com", PasswordHash = "hashed" };
+    [Fact]
+    public async Task GetProfile_GivenExistingUser_ReturnsSuccessWithMappedData()
+    {
+        var user = new User { Id = 5, FullName = "Test", Email = "test@gmail.com", PasswordHash = "hashed" };
 
-    //     _mockCurrentUser.Setup(x => x.GetUserId()).Returns(5);
-    //     SetupUserGetAsync(user);
-    //     _mockMapper.Setup(x => x.Map<UserProfileResponse>(user))
-    //         .Returns(new UserProfileResponse { FullName = "Test", Email = "test@gmail.com" , Role = "Viewer" , Status = "Active"});
+        _mockCurrentUser.Setup(x => x.GetUserId()).Returns(5);
+        SetupUserGetAsync(user);
+        _mockMapper.Setup(x => x.Map<UserProfileResponse>(user))
+            .Returns(new UserProfileResponse { FullName = "Test", Email = "test@gmail.com", Role = "Viewer", Status = "Active" });
 
-    //     var result = await _service.GetProfile();
+        var result = await _service.GetProfile();
 
-    //     Assert.True(result.IsSuccess);
-    //     Assert.Equal("Test", result.Data!.FullName);
-    // }
+        Assert.True(result.IsSuccess);
+        Assert.Equal("Test", result.Data!.FullName);
+    }
 
-    // [Fact]
-    // public async Task UpdateProfile_GivenUserNotFound_ReturnsNotFound()
-    // {
-    //     _mockCurrentUser.Setup(x => x.GetUserId()).Returns(5);
-    //     _mockInputNormalizer.Setup(x => x.NormalizeObject(It.IsAny<UpdateProfileRequest>())).Returns((UpdateProfileRequest r) => r);
-    //     SetupUserGetAsync(null);
+    [Fact]
+    public async Task UpdateProfile_GivenUserNotFound_ReturnsNotFound()
+    {
+        _mockCurrentUser.Setup(x => x.GetUserId()).Returns(5);
+        _mockInputNormalizer.Setup(x => x.NormalizeObject(It.IsAny<UpdateProfileRequest>())).Returns((UpdateProfileRequest r) => r);
+        SetupUserGetAsync(null);
 
-    //     var result = await _service.UpdateProfile(new UpdateProfileRequest { FullName = "New Name" });
+        var result = await _service.UpdateProfile(new UpdateProfileRequest { FullName = "New Name" });
 
-    //     Assert.False(result.IsSuccess);
-    //     Assert.Equal(404, result.StatusCode);
-    // }
+        Assert.False(result.IsSuccess);
+        Assert.Equal(404, result.StatusCode);
+    }
 
-    // [Fact]
-    // public async Task UpdateProfile_GivenBlankFullName_KeepsExistingFullName()
-    // {
-    //     var user = new User { Id = 5, FullName = "Test", Email = "test@gmail.com", PasswordHash = "hashed", PhoneNumber = "1234567890" };
+    [Fact]
+    public async Task UpdateProfile_GivenBlankFullName_KeepsExistingFullName()
+    {
+        var user = new User { Id = 5, FullName = "Test", Email = "test@gmail.com", PasswordHash = "hashed", PhoneNumber = "1234567890" };
 
-    //     _mockCurrentUser.Setup(x => x.GetUserId()).Returns(5);
-    //     _mockInputNormalizer.Setup(x => x.NormalizeObject(It.IsAny<UpdateProfileRequest>())).Returns((UpdateProfileRequest r) => r);
-    //     SetupUserGetAsync(user);
-    //     _mockUserRepo.Setup(x => x.SaveChangesAsync()).ReturnsAsync(true);
-    //     _mockMapper.Setup(x => x.Map<UserProfileResponse>(user)).Returns(new UserProfileResponse { FullName = "Test",Email = "test@gmail.com", Role = "Viewer" , Status = "Active" });
+        _mockCurrentUser.Setup(x => x.GetUserId()).Returns(5);
+        _mockInputNormalizer.Setup(x => x.NormalizeObject(It.IsAny<UpdateProfileRequest>())).Returns((UpdateProfileRequest r) => r);
+        SetupUserGetAsync(user);
+        _mockUserRepo.Setup(x => x.SaveChangesAsync()).ReturnsAsync(true);
+        _mockMapper.Setup(x => x.Map<UserProfileResponse>(user)).Returns(new UserProfileResponse { FullName = "Test", Email = "test@gmail.com", Role = "Viewer", Status = "Active" });
 
-    //     var result = await _service.UpdateProfile(new UpdateProfileRequest { FullName = "   ", PhoneNumber = "9999999999" });
+        var result = await _service.UpdateProfile(new UpdateProfileRequest { FullName = "   ", PhoneNumber = "9999999999" });
 
-    //     Assert.True(result.IsSuccess);
-    //     Assert.Equal("Test", user.FullName);
-    //     Assert.Equal("9999999999", user.PhoneNumber);
-    // }
+        Assert.True(result.IsSuccess);
+        Assert.Equal("Test", user.FullName);
+        Assert.Equal("9999999999", user.PhoneNumber);
+    }
 
-    // [Fact]
-    // public async Task UpdateProfile_GivenBlankPhoneNumber_ClearsPhoneNumberToNull()
-    // {
-    //     var user = new User { Id = 5, FullName = "Test", Email = "test@gmail.com", PasswordHash = "hashed", PhoneNumber = "1234567890" };
+    [Fact]
+    public async Task UpdateProfile_GivenBlankPhoneNumber_ClearsPhoneNumberToNull()
+    {
+        var user = new User { Id = 5, FullName = "Test", Email = "test@gmail.com", PasswordHash = "hashed", PhoneNumber = "1234567890" };
 
-    //     _mockCurrentUser.Setup(x => x.GetUserId()).Returns(5);
-    //     _mockInputNormalizer.Setup(x => x.NormalizeObject(It.IsAny<UpdateProfileRequest>())).Returns((UpdateProfileRequest r) => r);
-    //     SetupUserGetAsync(user);
-    //     _mockUserRepo.Setup(x => x.SaveChangesAsync()).ReturnsAsync(true);
-    //     _mockMapper.Setup(x => x.Map<UserProfileResponse>(user)).Returns(new UserProfileResponse { FullName = "Test", Email = "test@gmail.com", Role = "Viewer" , Status = "Active" });
+        _mockCurrentUser.Setup(x => x.GetUserId()).Returns(5);
+        _mockInputNormalizer.Setup(x => x.NormalizeObject(It.IsAny<UpdateProfileRequest>())).Returns((UpdateProfileRequest r) => r);
+        SetupUserGetAsync(user);
+        _mockUserRepo.Setup(x => x.SaveChangesAsync()).ReturnsAsync(true);
+        _mockMapper.Setup(x => x.Map<UserProfileResponse>(user)).Returns(new UserProfileResponse { FullName = "Test", Email = "test@gmail.com", Role = "Viewer", Status = "Active" });
 
-    //     var result = await _service.UpdateProfile(new UpdateProfileRequest { PhoneNumber = "  " });
+        var result = await _service.UpdateProfile(new UpdateProfileRequest { PhoneNumber = "  " });
 
-    //     Assert.True(result.IsSuccess);
-    //     Assert.Null(user.PhoneNumber);
-    // }
+        Assert.True(result.IsSuccess);
+        Assert.Null(user.PhoneNumber);
+    }
 
-    // [Fact]
-    // public async Task UpdateProfile_GivenValidChanges_UpdatesFieldsAndReturnsSuccess()
-    // {
-    //     var user = new User { Id = 5, FullName = "Test", Email = "test@gmail.com", PasswordHash = "hashed" };
+    [Fact]
+    public async Task UpdateProfile_GivenValidChanges_UpdatesFieldsAndReturnsSuccess()
+    {
+        var user = new User { Id = 5, FullName = "Test", Email = "test@gmail.com", PasswordHash = "hashed" };
 
-    //     _mockCurrentUser.Setup(x => x.GetUserId()).Returns(5);
-    //     _mockInputNormalizer.Setup(x => x.NormalizeObject(It.IsAny<UpdateProfileRequest>())).Returns((UpdateProfileRequest r) => r);
-    //     SetupUserGetAsync(user);
-    //     _mockUserRepo.Setup(x => x.SaveChangesAsync()).ReturnsAsync(true);
-    //     _mockMapper.Setup(x => x.Map<UserProfileResponse>(user)).Returns(new UserProfileResponse { FullName = "Vivian Viewer", PhoneNumber = "9999999999" , Email = "test@gmail.com", Role = "Viewer" , Status = "Active" });
+        _mockCurrentUser.Setup(x => x.GetUserId()).Returns(5);
+        _mockInputNormalizer.Setup(x => x.NormalizeObject(It.IsAny<UpdateProfileRequest>())).Returns((UpdateProfileRequest r) => r);
+        SetupUserGetAsync(user);
+        _mockUserRepo.Setup(x => x.SaveChangesAsync()).ReturnsAsync(true);
+        _mockMapper.Setup(x => x.Map<UserProfileResponse>(user)).Returns(new UserProfileResponse { FullName = "Vivian Viewer", PhoneNumber = "9999999999", Email = "test@gmail.com", Role = "Viewer", Status = "Active" });
 
-    //     var result = await _service.UpdateProfile(new UpdateProfileRequest { FullName = "Vivian Viewer", PhoneNumber = "9999999999" });
+        var result = await _service.UpdateProfile(new UpdateProfileRequest { FullName = "Vivian Viewer", PhoneNumber = "9999999999" });
 
-    //     Assert.True(result.IsSuccess);
-    //     Assert.Equal("Vivian Viewer", user.FullName);
-    //     Assert.Equal("9999999999", user.PhoneNumber);
-    //     Assert.Equal(5, user.ModifiedBy);
-    //     _mockUserRepo.Verify(x => x.SaveChangesAsync(), Times.Once);
-    // }
+        Assert.True(result.IsSuccess);
+        Assert.Equal("Vivian Viewer", user.FullName);
+        Assert.Equal("9999999999", user.PhoneNumber);
+        Assert.Equal(5, user.ModifiedBy);
+        _mockUserRepo.Verify(x => x.SaveChangesAsync(), Times.Once);
+    }
 }
