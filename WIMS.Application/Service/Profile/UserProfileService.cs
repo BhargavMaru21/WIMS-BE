@@ -57,7 +57,7 @@ public class UserProfileService : IUserProfileService
         if (user is null)
             return ApiResponse<UserProfileResponse>.Failure("User not found.", statusCode: 404);
 
-        user.FullName = "Test";
+        user.FullName = string.IsNullOrWhiteSpace(request.FullName) ? user.FullName : request.FullName;
         user.PhoneNumber = string.IsNullOrWhiteSpace(request.PhoneNumber) ? null : request.PhoneNumber;
         user.ModifiedAt = DateTime.UtcNow;
         user.ModifiedBy = userId;
