@@ -1,6 +1,7 @@
-using System.Security.Cryptography;
+﻿using System.Security.Cryptography;
 using MailKit.Net.Smtp;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Configuration;
 using WIMS.Application.CommonServices;
 using WIMS.Application.DTOs;
 using WIMS.Application.DTOs.Auth;
@@ -22,6 +23,7 @@ public class AuthService : IAuthService
     private readonly IEmailService _emailService;
     private readonly IHttpContextAccessor _httpContextAccessor;
     private readonly ICurrentUserService _currentUser;
+    private readonly IConfiguration _configuration;
 
     public AuthService(
         IJwtService jwtService,
@@ -31,7 +33,8 @@ public class AuthService : IAuthService
         ICodeGeneratorService code,
         IEmailService emailService,
         IHttpContextAccessor httpContextAccessor,
-        ICurrentUserService currentUser
+        ICurrentUserService currentUser,
+        IConfiguration configuration
         )
     {
         _jwtService = jwtService;
@@ -42,6 +45,7 @@ public class AuthService : IAuthService
         _emailService = emailService;
         _httpContextAccessor = httpContextAccessor;
         _currentUser = currentUser;
+        _configuration = configuration;
     }
 
     public async Task<ApiResponse<LoginResponse>> Login(LoginRequest request)
@@ -91,13 +95,7 @@ public class AuthService : IAuthService
 
         await _userRepository.SaveChangesAsync();
 
-        _httpContextAccessor.HttpContext!.Response.Cookies.Append("RefreshToken", tokenResponse.RefreshToken, new CookieOptions
-        {
-            HttpOnly = true,
-            Secure = true,
-            SameSite = SameSiteMode.None,
-            Expires = DateTime.UtcNow.AddDays(10)
-        });
+        _httpContextAccessor.HttpContext!.Response.Cookies.Append("RefreshToken", tokenResponse.RefreshToken, GetRefreshTokenCookieOptions(tokenResponse.RefreshTokenExpiryTime));
 
         var response = new LoginResponse
         {
@@ -170,13 +168,7 @@ public class AuthService : IAuthService
 
         await _userRepository.SaveChangesAsync();
 
-        _httpContextAccessor.HttpContext.Response.Cookies.Append("RefreshToken", tokenResponse.RefreshToken, new CookieOptions
-        {
-            HttpOnly = true,
-            Secure = true,
-            SameSite = SameSiteMode.None,
-            Expires = DateTime.UtcNow.AddDays(10)
-        });
+        _httpContextAccessor.HttpContext.Response.Cookies.Append("RefreshToken", tokenResponse.RefreshToken, GetRefreshTokenCookieOptions(tokenResponse.RefreshTokenExpiryTime));
 
         var response = new LoginResponse
         {
@@ -241,12 +233,7 @@ public class AuthService : IAuthService
 
         await _userRepository.SaveChangesAsync();
 
-        _httpContextAccessor.HttpContext.Response.Cookies.Delete("RefreshToken", new CookieOptions
-        {
-            HttpOnly = true,
-            Secure = true,
-            SameSite = SameSiteMode.None
-        });
+        _httpContextAccessor.HttpContext.Response.Cookies.Delete("RefreshToken", GetRefreshTokenCookieOptions());
 
         return ApiResponse<string>.Success("Logout Successfully", "Logout Successfully", 200);
     }
@@ -339,12 +326,7 @@ public class AuthService : IAuthService
 
         await _userRepository.SaveChangesAsync();
 
-        _httpContextAccessor.HttpContext!.Response.Cookies.Delete("RefreshToken", new CookieOptions
-        {
-            HttpOnly = true,
-            Secure = true,
-            SameSite = SameSiteMode.None
-        });
+        _httpContextAccessor.HttpContext!.Response.Cookies.Delete("RefreshToken", GetRefreshTokenCookieOptions());
 
         return ApiResponse<string>.Success("Password reset successfully. You can now log in.", statusCode: 200);
     }
@@ -369,5 +351,48 @@ public class AuthService : IAuthService
         }
 
         return ApiResponse<bool>.Success(true, "Valid link", 200);
+    }
+
+    private CookieOptions GetRefreshTokenCookieOptions(DateTimeOffset? expires = null)
+    {
+        var isHttps = _httpContextAccessor.HttpContext?.Request.IsHttps ?? false;
+        
+        bool isSecure = isHttps;
+        if (bool.TryParse(_configuration?["CookieSettings:Secure"], out var configuredSecure))
+        {
+            isSecure = configuredSecure;
+        }
+
+        var sameSiteConfig = _configuration?["CookieSettings:SameSite"];
+        SameSiteMode sameSite;
+
+        if (!isSecure)
+        {
+            // Modern browsers reject SameSite=None if Secure is false.
+            sameSite = SameSiteMode.Lax;
+        }
+        else if (Enum.TryParse<SameSiteMode>(sameSiteConfig, true, out var parsed))
+        {
+            sameSite = parsed;
+        }
+        else
+        {
+            sameSite = SameSiteMode.None;
+        }
+
+        var options = new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = isSecure,
+            SameSite = sameSite,
+            Path = "/"
+        };
+
+        if (expires.HasValue)
+        {
+            options.Expires = expires.Value;
+        }
+
+        return options;
     }
 }

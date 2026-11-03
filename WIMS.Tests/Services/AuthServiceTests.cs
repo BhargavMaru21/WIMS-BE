@@ -1,5 +1,6 @@
-using MailKit.Net.Smtp;
+﻿using MailKit.Net.Smtp;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Configuration;
 using Moq;
 using WIMS.Application.DTOs.Auth;
 using WIMS.Application.DTOs;
@@ -23,6 +24,7 @@ public class AuthServiceTests
     private readonly Mock<IEmailService> _mockEmailService;
     private readonly Mock<IHttpContextAccessor> _mockHttpContextAccessor;
     private readonly Mock<ICurrentUserService> _mockCurrentUser;
+    private readonly Mock<IConfiguration> _mockConfiguration;
     private readonly DefaultHttpContext _httpContext;
     private readonly AuthService _service;
 
@@ -36,6 +38,7 @@ public class AuthServiceTests
         _mockEmailService = new Mock<IEmailService>();
         _mockHttpContextAccessor = new Mock<IHttpContextAccessor>();
         _mockCurrentUser = new Mock<ICurrentUserService>();
+        _mockConfiguration = new Mock<IConfiguration>();
 
         _httpContext = new DefaultHttpContext();
         _mockHttpContextAccessor.Setup(x => x.HttpContext).Returns(_httpContext);
@@ -56,7 +59,8 @@ public class AuthServiceTests
             _mockCodeGenerator.Object,
             _mockEmailService.Object,
             _mockHttpContextAccessor.Object,
-            _mockCurrentUser.Object);
+            _mockCurrentUser.Object,
+            _mockConfiguration.Object);
     }
     private void SetIncomingCookie(string value)
     {
@@ -511,5 +515,59 @@ public class AuthServiceTests
 
         Assert.True(result.IsSuccess);
         Assert.True(result.Data);
+    }
+
+    [Fact]
+    public async Task Login_WhenCookieSecureIsFalse_SetsLaxAndInsecureCookie()
+    {
+        _mockConfiguration.Setup(x => x["CookieSettings:Secure"]).Returns("false");
+        _mockConfiguration.Setup(x => x["CookieSettings:SameSite"]).Returns("Lax");
+
+        var user = MakeUser();
+        _mockUserRepo.Setup(x => x.GetByEmailAsync(user.Email)).ReturnsAsync(user);
+        _mockPasswordHasher.Setup(x => x.Verify("correct-pw", user.PasswordHash)).Returns(true);
+        _mockJwtService.Setup(x => x.generateToken(user)).Returns(new GenerateTokenResponse
+        {
+            AccessToken = "access-token-abc",
+            RefreshToken = "refresh-token-xyz",
+            RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(10)
+        });
+        _mockPasswordHasher.Setup(x => x.NormalHash("refresh-token-xyz")).Returns("hashed-refresh-token");
+        _mockUserRepo.Setup(x => x.SaveChangesAsync()).ReturnsAsync(true);
+
+        var result = await _service.Login(new LoginRequest { Email = user.Email, Password = "correct-pw" });
+
+        Assert.True(result.IsSuccess);
+        var setCookie = _httpContext.Response.Headers.SetCookie.ToString();
+        Assert.Contains("RefreshToken", setCookie);
+        Assert.Contains("samesite=lax", setCookie, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("secure", setCookie, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Login_WhenCookieSecureIsTrue_SetsNoneAndSecureCookie()
+    {
+        _mockConfiguration.Setup(x => x["CookieSettings:Secure"]).Returns("true");
+        _mockConfiguration.Setup(x => x["CookieSettings:SameSite"]).Returns("None");
+
+        var user = MakeUser();
+        _mockUserRepo.Setup(x => x.GetByEmailAsync(user.Email)).ReturnsAsync(user);
+        _mockPasswordHasher.Setup(x => x.Verify("correct-pw", user.PasswordHash)).Returns(true);
+        _mockJwtService.Setup(x => x.generateToken(user)).Returns(new GenerateTokenResponse
+        {
+            AccessToken = "access-token-abc",
+            RefreshToken = "refresh-token-xyz",
+            RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(10)
+        });
+        _mockPasswordHasher.Setup(x => x.NormalHash("refresh-token-xyz")).Returns("hashed-refresh-token");
+        _mockUserRepo.Setup(x => x.SaveChangesAsync()).ReturnsAsync(true);
+
+        var result = await _service.Login(new LoginRequest { Email = user.Email, Password = "correct-pw" });
+
+        Assert.True(result.IsSuccess);
+        var setCookie = _httpContext.Response.Headers.SetCookie.ToString();
+        Assert.Contains("RefreshToken", setCookie);
+        Assert.Contains("samesite=none", setCookie, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("secure", setCookie, StringComparison.OrdinalIgnoreCase);
     }
 }
