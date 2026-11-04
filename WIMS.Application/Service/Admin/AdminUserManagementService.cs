@@ -1,4 +1,4 @@
-using AutoMapper;
+﻿using AutoMapper;
 using MailKit.Net.Smtp;
 using Microsoft.EntityFrameworkCore;
 using WIMS.Application.DTOs;
@@ -38,8 +38,8 @@ public class AdminUserManagementService : IAdminUserManagementService
     {
         _userRepository = userRepository;
         _passwordHasher = passwordHasher;
-        _emailService = emailService;
         _warehouseRepo = warehouseRepo;
+        _emailService = emailService;
         _mapper = mapper;
         _inputNormalizer = inputNormalizer;
         _currentUser = currentUser;
@@ -66,10 +66,11 @@ public class AdminUserManagementService : IAdminUserManagementService
         if (warehouseValidation is not null)
             return warehouseValidation;
 
-        if (!await _emailService.IsEmailDomainValidAsync(request.Email))
-        {
-            return ApiResponse<UserResponseDto>.Failure("Invalid email domain. Please check and try again.", null, 400);
-        }
+        // NOTE: Temporarily commented out due to email service outage. Uncomment when SMTP credentials are restored:
+        // if (!await _emailService.IsEmailDomainValidAsync(request.Email))
+        // {
+        //     return ApiResponse<UserResponseDto>.Failure("Invalid email domain. Please check and try again.", null, 400);
+        // }
 
         var passwordHash = _passwordHasher.Hash(request.Password);
 
@@ -90,10 +91,11 @@ public class AdminUserManagementService : IAdminUserManagementService
         {
             var result = await _userRepository.CreateAsync(newUser);
 
-            string subject = "WIMS Credentials";
-            string body = $"Dear {request.FullName},\n\nYour account has been created successfully. Here are your credentials:\n\nEmail: {request.Email}\nPassword: {request.Password}\n\nPlease log in and change your password immediately for security reasons.\n\nBest regards,\nWIMS Team";
+            // NOTE: Temporarily commented out due to email service outage. Uncomment when SMTP credentials are restored:
+            // string subject = "WIMS Credentials";
+            // string body = $"Dear {request.FullName},\n\nYour account has been created successfully. Here are your credentials:\n\nEmail: {request.Email}\nPassword: {request.Password}\n\nPlease log in and change your password immediately for security reasons.\n\nBest regards,\nWIMS Team";
+            // await _emailService.SendEmailAsync(request.Email, subject, body);
 
-            await _emailService.SendEmailAsync(request.Email, subject, body);
             await _userRepository.CommitTransactionAsync();
 
             var userWithWarehouse = await _userRepository.GetAsync(
@@ -104,11 +106,12 @@ public class AdminUserManagementService : IAdminUserManagementService
 
             return ApiResponse<UserResponseDto>.Success(response, "User created Successfully", 201);
         }
-        catch (SmtpCommandException ex) when (ex.StatusCode == SmtpStatusCode.MailboxUnavailable || ex.Message.Contains("No such person"))
-        {
-            await _userRepository.RollbackTransactionAsync();
-            return ApiResponse<UserResponseDto>.Failure("The email address does not exist. Please check and try again.");
-        }
+        // NOTE: Temporarily commented out due to email service outage. Uncomment when SMTP credentials are restored:
+        // catch (SmtpCommandException ex) when (ex.StatusCode == SmtpStatusCode.MailboxUnavailable || ex.Message.Contains("No such person"))
+        // {
+        //     await _userRepository.RollbackTransactionAsync();
+        //     return ApiResponse<UserResponseDto>.Failure("The email address does not exist. Please check and try again.");
+        // }
         catch (Exception)
         {
             await _userRepository.RollbackTransactionAsync();

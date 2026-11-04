@@ -342,64 +342,16 @@ public class AuthServiceTests
         Assert.Null(user.RefreshTokenExpiryTime);
     }
 
-    [Fact]
-    public async Task ForgotPassword_GivenUserNotFound_ReturnsNotFound()
-    {
-        _mockUserRepo.Setup(x => x.GetByEmailAsync("ghost@wims.com")).ReturnsAsync((User?)null);
 
-        var result = await _service.ForgotPassword(new ForgotPasswordRequest { Email = "ghost@wims.com" });
+
+    [Fact]
+    public async Task ForgotPassword_ReturnsServiceUnavailable()
+    {
+        var result = await _service.ForgotPassword(new ForgotPasswordRequest { Email = "user@wims.com" });
 
         Assert.False(result.IsSuccess);
-        Assert.Equal(404, result.StatusCode);
-    }
-
-    [Fact]
-    public async Task ForgotPassword_GivenInvalidEmailDomain_ReturnsFailure()
-    {
-        var user = MakeUser();
-        _mockUserRepo.Setup(x => x.GetByEmailAsync(user.Email)).ReturnsAsync(user);
-        _mockEmailService.Setup(x => x.IsEmailDomainValidAsync(user.Email)).ReturnsAsync(false);
-
-        var result = await _service.ForgotPassword(new ForgotPasswordRequest { Email = user.Email });
-
-        Assert.False(result.IsSuccess);
-        Assert.Equal(400, result.StatusCode);
-    }
-
-    [Fact]
-    public async Task ForgotPassword_GivenValidRequest_SendsEmailAndReturnsSuccess()
-    {
-        var user = MakeUser();
-        _mockUserRepo.Setup(x => x.GetByEmailAsync(user.Email)).ReturnsAsync(user);
-        _mockEmailService.Setup(x => x.IsEmailDomainValidAsync(user.Email)).ReturnsAsync(true);
-        _mockPasswordHasher.Setup(x => x.NormalHash(It.IsAny<string>())).Returns("hashed-reset-token");
-        _mockUserRepo.Setup(x => x.SaveChangesAsync()).ReturnsAsync(true);
-
-        var result = await _service.ForgotPassword(new ForgotPasswordRequest { Email = user.Email });
-
-        Assert.True(result.IsSuccess);
-        Assert.Equal("hashed-reset-token", user.PasswordResetTokenHash);
-        _mockEmailService.Verify(x => x.SendEmailAsync(user.Email, It.IsAny<string>(), It.IsAny<string>()), Times.Once);
-        _mockUserRepo.Verify(x => x.CommitTransactionAsync(), Times.Once);
-    }
-
-    [Fact]
-    public async Task ForgotPassword_GivenMailboxDoesNotExist_RollsBackAndReturnsFriendlyMessage()
-    {
-        var user = MakeUser();
-        _mockUserRepo.Setup(x => x.GetByEmailAsync(user.Email)).ReturnsAsync(user);
-        _mockEmailService.Setup(x => x.IsEmailDomainValidAsync(user.Email)).ReturnsAsync(true);
-        _mockPasswordHasher.Setup(x => x.NormalHash(It.IsAny<string>())).Returns("hashed-reset-token");
-        _mockUserRepo.Setup(x => x.SaveChangesAsync()).ReturnsAsync(true);
-        _mockEmailService
-            .Setup(x => x.SendEmailAsync(user.Email, It.IsAny<string>(), It.IsAny<string>()))
-            .ThrowsAsync(new SmtpCommandException(SmtpErrorCode.RecipientNotAccepted, SmtpStatusCode.MailboxUnavailable, "No such person"));
-
-        var result = await _service.ForgotPassword(new ForgotPasswordRequest { Email = user.Email });
-
-        Assert.False(result.IsSuccess);
-        Assert.Contains("does not exist", result.Message);
-        _mockUserRepo.Verify(x => x.RollbackTransactionAsync(), Times.Once);
+        Assert.Equal(503, result.StatusCode);
+        Assert.Contains("unavailable", result.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
