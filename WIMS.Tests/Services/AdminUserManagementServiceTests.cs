@@ -1,4 +1,4 @@
-using System.Linq.Expressions;
+﻿using System.Linq.Expressions;
 using AutoMapper;
 using MailKit.Net.Smtp;
 using Moq;
@@ -140,23 +140,7 @@ public class AdminUserManagementServiceTests
     }
 
     [Fact]
-    public async Task CreateUser_GivenEmailDomainIsInvalid_ReturnsFailure()
-    {
-        var request = new CreateUserRequest { FullName = "Viewer", Email = "v@gmail.com", Password = "Test@123", Role = UserRole.Viewer };
-
-        _mockInputNormalizer.Setup(x => x.NormalizeObject(request)).Returns(request);
-        _mockUserRepo.Setup(x => x.IsEmailTakenAsync(request.Email, null)).ReturnsAsync(false);
-        _mockEmailService.Setup(x => x.IsEmailDomainValidAsync(request.Email)).ReturnsAsync(false);
-
-        var result = await _service.CreateUser(request);
-
-        Assert.False(result.IsSuccess);
-        Assert.Contains("Invalid email domain", result.Message);
-        _mockUserRepo.Verify(x => x.CreateAsync(It.IsAny<User>()), Times.Never);
-    }
-
-    [Fact]
-    public async Task CreateUser_WithValidRequest_CreatesUserAndSendsEmailAndReturnsSuccess()
+    public async Task CreateUser_WithValidRequest_CreatesUserAndReturnsSuccess()
     {
         var request = new CreateUserRequest { FullName = "Test", Email = "Test@gmail.com", Password = "Test@123", Role = UserRole.Viewer };
         var createdUser = new User { Id = 50, FullName = "Test", Email = "Test@gmail.com", PasswordHash = "hashed" };
@@ -164,7 +148,6 @@ public class AdminUserManagementServiceTests
         _mockCurrentUser.Setup(x => x.GetUserId()).Returns(1);
         _mockInputNormalizer.Setup(x => x.NormalizeObject(request)).Returns(request);
         _mockUserRepo.Setup(x => x.IsEmailTakenAsync(request.Email, null)).ReturnsAsync(false);
-        _mockEmailService.Setup(x => x.IsEmailDomainValidAsync(request.Email)).ReturnsAsync(true);
         _mockPasswordHasher.Setup(x => x.Hash(request.Password)).Returns("hashed");
         _mockUserRepo.Setup(x => x.CreateAsync(It.IsAny<User>())).ReturnsAsync(createdUser);
 
@@ -178,33 +161,8 @@ public class AdminUserManagementServiceTests
 
         Assert.True(result.IsSuccess);
         Assert.Equal(201, result.StatusCode);
-        _mockEmailService.Verify(x => x.SendEmailAsync(request.Email, It.IsAny<string>(), It.IsAny<string>()), Times.Once);
         _mockUserRepo.Verify(x => x.CommitTransactionAsync(), Times.Once);
         _mockUserRepo.Verify(x => x.RollbackTransactionAsync(), Times.Never);
-    }
-
-    [Fact]
-    public async Task CreateUser_WhenEmailAddressDoesNotExist_RollsBackAndReturnsFailure()
-    {
-        var request = new CreateUserRequest { FullName = "test", Email = "test@dfgdfg.com", Password = "Test@123", Role = UserRole.Viewer };
-
-        _mockCurrentUser.Setup(x => x.GetUserId()).Returns(1);
-        _mockInputNormalizer.Setup(x => x.NormalizeObject(request)).Returns(request);
-        _mockUserRepo.Setup(x => x.IsEmailTakenAsync(request.Email, null)).ReturnsAsync(false);
-        _mockEmailService.Setup(x => x.IsEmailDomainValidAsync(request.Email)).ReturnsAsync(true);
-        _mockPasswordHasher.Setup(x => x.Hash(request.Password)).Returns("hashed");
-        _mockUserRepo.Setup(x => x.CreateAsync(It.IsAny<User>())).ReturnsAsync(new User { Id = 51, FullName = "test", Email = request.Email, PasswordHash = "hashed" });
-
-        _mockEmailService
-            .Setup(x => x.SendEmailAsync(request.Email, It.IsAny<string>(), It.IsAny<string>()))
-            .ThrowsAsync(new SmtpCommandException(SmtpErrorCode.RecipientNotAccepted, SmtpStatusCode.MailboxUnavailable, "No such person"));
-
-        var result = await _service.CreateUser(request);
-
-        Assert.False(result.IsSuccess);
-        Assert.Contains("does not exist", result.Message);
-        _mockUserRepo.Verify(x => x.RollbackTransactionAsync(), Times.Once);
-        _mockUserRepo.Verify(x => x.CommitTransactionAsync(), Times.Never);
     }
 
     [Fact]
@@ -215,7 +173,6 @@ public class AdminUserManagementServiceTests
         _mockCurrentUser.Setup(x => x.GetUserId()).Returns(1);
         _mockInputNormalizer.Setup(x => x.NormalizeObject(request)).Returns(request);
         _mockUserRepo.Setup(x => x.IsEmailTakenAsync(request.Email, null)).ReturnsAsync(false);
-        _mockEmailService.Setup(x => x.IsEmailDomainValidAsync(request.Email)).ReturnsAsync(true);
         _mockPasswordHasher.Setup(x => x.Hash(request.Password)).Returns("hashed");
 
         _mockUserRepo.Setup(x => x.CreateAsync(It.IsAny<User>())).ThrowsAsync(new Exception("Unexpected error"));

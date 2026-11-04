@@ -1,5 +1,5 @@
-﻿using System.Security.Cryptography;
-using MailKit.Net.Smtp;
+﻿using MailKit.Net.Smtp;
+using System.Security.Cryptography;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using WIMS.Application.CommonServices;
@@ -240,6 +240,13 @@ public class AuthService : IAuthService
 
     public async Task<ApiResponse<string>> ForgotPassword(ForgotPasswordRequest request)
     {
+        // NOTE: Temporarily disabled due to email service outage.
+        return ApiResponse<string>.Failure(
+            "Password reset service is temporarily unavailable due to an email service issue. Please contact your administrator.",
+            statusCode: 503);
+
+        /*
+        // UNCOMMENT WHEN EMAIL SERVICE IS RESTORED:
         string userEmail = _inputNormalizer.NormalizeEmail(request.Email);
 
         User? user = await _userRepository.GetByEmailAsync(userEmail);
@@ -273,7 +280,7 @@ public class AuthService : IAuthService
                 $"?token={Uri.EscapeDataString(token)}" +
                 $"&email={Uri.EscapeDataString(user.Email)}";
 
-            var body = $@"
+            var body = @"
             <p>Hi <strong>{user.FullName}</strong>,</p>
             <p>You requested a password reset. Click the link below:</p>
             <p>
@@ -286,7 +293,6 @@ public class AuthService : IAuthService
             <p>This link expires in <strong>30 minutes</strong>.</p>
             <p>If you did not request this, ignore this email.</p>";
 
-
             await _emailService.SendEmailAsync(user.Email, "Reset your password", body);
             await _userRepository.CommitTransactionAsync();
             return ApiResponse<string>.Success($"Resent link has been sent to {user.Email}.", statusCode: 200);
@@ -296,6 +302,7 @@ public class AuthService : IAuthService
             await _userRepository.RollbackTransactionAsync();
             return ApiResponse<string>.Failure("The email address does not exist. Please check and try again.", statusCode: 400);
         }
+        */
     }
 
     public async Task<ApiResponse<string>> ResetPassword(ResetPasswordRequest request)
