@@ -24,3 +24,5 @@ public class CodeGeneratorService:ICodeGeneratorService
         return $"{prefix}-{number:D3}";
     }
 }
+
+// Test 
